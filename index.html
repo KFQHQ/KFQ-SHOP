@@ -5,9 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vapor Menu</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
+@font-face {
+  font-family: "Smilen";
+  src: url("./fonts/Smilen.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
   :root {
     --bg: #101214;
     --surface: #1B1E22;
@@ -348,6 +354,70 @@
     font-size: 0.75rem;
     padding-top: 40px;
   }
+/* Apply Smilen to the entire page */
+/* Smilen for words and headings */
+body,
+button,
+h1,
+h2,
+h3,
+.display {
+  font-family: "Smilen", sans-serif !important;
+  font-weight: 400;
+  line-height: 1.2;
+}
+/* Standard font for all prices, quantities, IDs, and phone inputs */
+.mono,
+.price,
+.cart-btn .count,
+.qty-controls .n,
+.qty-controls button,
+.cartSubtotal,
+#cartSubtotal,
+.order-confirm .order-id,
+.order-confirm .total-line,
+#confirmOrderId,
+#confirmTotal,
+input[type="tel"],
+input[type="number"] {
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-weight: 700;
+}
+/* Make small Smilen text easier to read */
+.card-body h3 {
+  font-size: 1.18rem;
+}
+
+.card-body .flavor {
+  font-size: 1rem;
+}
+
+.price {
+  font-size: 1.08rem;
+}
+
+.stock-note {
+  font-size: 0.9rem;
+}
+
+.add-btn {
+  font-size: 1rem;
+}
+
+.cart-btn,
+.primary-btn,
+.secondary-btn,
+.pay-option {
+  font-size: 1rem;
+}
+
+.field label,
+.qr-caption,
+.summary-row,
+.cart-row .info .name,
+.cart-row .info .flavor-line {
+  font-size: 0.95rem;
+}
 </style>
 </head>
 <body>
