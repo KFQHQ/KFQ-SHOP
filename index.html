@@ -510,8 +510,8 @@ input[type="number"] {
 .corner-mascot {
   position: fixed;
   bottom: 0px;
-  right: 12px;
-  width: 190px;
+  left: 12px;
+  width: 120px;
   height: auto;
   z-index: 30;
   pointer-events: none;
@@ -519,7 +519,7 @@ input[type="number"] {
   filter: drop-shadow(0 4px 14px rgba(0,0,0,0.45));
 }
 @media (max-width: 480px) {
-  .corner-mascot { width: 130px; bottom: 0px; right: 8px; }
+  .corner-mascot { width: 90px; bottom: 0px; left: 8px; }
 }
 
 .payment-close-btn:disabled {
@@ -675,6 +675,7 @@ input[type="number"] {
    CONFIG — fill in your deployed Apps Script Web App URL below.
    ========================================================================= */
 const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xscd7fTE5PpPWYGz8gdiTd-dTVwatXdXGzGJIKurl_ljUyyjI-IAQg/exec";
+const SITE_TOKEN = "kfq-shop-2026-a91f"; // must match CONFIG.SITE_TOKEN in Apps Script's Config.gs
 
 /* ------------------------------------------------------------------------
    State
@@ -713,7 +714,7 @@ async function apiPost(body) {
   const res = await fetch(API_BASE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight against Apps Script
-    body: JSON.stringify(body)
+    body: JSON.stringify(Object.assign({ token: SITE_TOKEN }, body))
   });
   return res.json();
 }
