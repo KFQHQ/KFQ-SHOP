@@ -30,17 +30,17 @@
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  body {
-    background-image: linear-gradient(rgba(8,9,10,0.74), rgba(8,9,10,0.74)), url('./images/background.jpg');
-    background-size: cover;
-    background-position: center top;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+body {
+  background-image: linear-gradient(rgba(8, 9, 10, 0.38), rgba(8, 9, 10, 0.38)), url('images/background.jpg');
+  background-size: cover;
+  background-position: center -180px;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: Inter, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
   @media (max-width: 768px) {
     /* background-attachment: fixed is unreliable/janky on many mobile browsers */
     body { background-attachment: scroll; }
