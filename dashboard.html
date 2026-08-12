@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KFQ Shop — Dashboard</title>
+<style>
+  :root {
+    --bg: #101214;
+    --surface: #1B1E22;
+    --surface-raised: #24282D;
+    --border: #303539;
+    --text: #EDEAE3;
+    --text-dim: #9A9C9E;
+    --accent: #3FD9C7;
+    --warm: #E8963C;
+    --danger: #E1553F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  h1, h2 { font-family: Arial, Helvetica, sans-serif; margin: 0 0 4px; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+
+  .gate {
+    max-width: 360px;
+    margin: 100px auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    text-align: center;
+  }
+  .gate input {
+    width: 100%;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 1rem;
+    margin: 14px 0;
+  }
+  .gate button, .refresh-btn {
+    background: var(--accent);
+    color: #0A2320;
+    font-weight: 700;
+    border: none;
+    border-radius: 999px;
+    padding: 11px 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+  .error { color: #F3A99A; font-size: 0.85rem; margin-top: 8px; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .stat-card .label { font-size: 0.78rem; color: var(--text-dim); }
+  .stat-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+  .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-dim); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+  tr:last-child td { border-bottom: none; }
+
+  .low-stock-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .low-stock-item:last-child { border-bottom: none; }
+  .low-stock-item .qty { color: var(--danger); font-weight: 700; }
+
+  .empty { color: var(--text-dim); font-size: 0.85rem; padding: 12px 0; }
+  #dashboardContent[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="gate" id="gate">
+    <h2>KFQ Shop Dashboard</h2>
+    <p style="color:var(--text-dim); font-size:0.85rem;">Owner access only.</p>
+    <input type="password" id="passwordInput" placeholder="Password">
+    <div><button id="unlockBtn">Unlock</button></div>
+    <div class="error" id="gateError"></div>
+  </div>
+
+  <div id="dashboardContent" hidden>
+    <div class="section-head">
+      <h1>Dashboard</h1>
+      <button class="refresh-btn" id="refreshBtn">Refresh</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Orders today</div>
+        <div class="value" id="todayCount">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Revenue today</div>
+        <div class="value" id="todayTotal">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Orders this week</div>
+        <div class="value" id="weekCount">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Revenue this week</div>
+        <div class="value" id="weekTotal">-</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2 style="font-size:1.05rem;">Low stock</h2></div>
+      <div id="lowStockList"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2 style="font-size:1.05rem;">Recent orders</h2></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Order</th><th>Date</th><th>Buyer</th><th>Phone</th><th>Items</th><th>Total</th><th>Payment</th><th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xscd7fTE5PpPWYGz8gdiTd-dTVwatXdXGzGJIKurl_ljUyyjI-IAQg/exec";
+
+let dashboardPassword = '';
+
+function money(n) { return '$' + Number(n || 0).toFixed(2); }
+
+async function apiPost(body) {
+  const res = await fetch(API_BASE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function unlock() {
+  const pw = document.getElementById('passwordInput').value;
+  const errorEl = document.getElementById('gateError');
+  errorEl.textContent = '';
+
+  const result = await apiPost({ action: 'getDashboardData', password: pw });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+  dashboardPassword = pw;
+  document.getElementById('gate').hidden = true;
+  document.getElementById('dashboardContent').hidden = false;
+  renderDashboard(result);
+}
+
+async function refresh() {
+  const result = await apiPost({ action: 'getDashboardData', password: dashboardPassword });
+  if (!result.error) renderDashboard(result);
+}
+
+function renderDashboard(data) {
+  document.getElementById('todayCount').textContent = data.todayCount;
+  document.getElementById('todayTotal').textContent = money(data.todayTotal);
+  document.getElementById('weekCount').textContent = data.weekCount;
+  document.getElementById('weekTotal').textContent = money(data.weekTotal);
+
+  const lowStockList = document.getElementById('lowStockList');
+  if (!data.lowStock.length) {
+    lowStockList.innerHTML = '<div class="empty">Nothing low right now.</div>';
+  } else {
+    lowStockList.innerHTML = data.lowStock.map(p => `
+      <div class="low-stock-item">
+        <span>${p.name}${p.flavor ? ' — ' + p.flavor : ''}</span>
+        <span class="qty">${p.quantity} left (threshold ${p.threshold})</span>
+      </div>
+    `).join('');
+  }
+
+  const tbody = document.getElementById('ordersTableBody');
+  if (!data.recentOrders.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No orders yet.</td></tr>';
+  } else {
+    tbody.innerHTML = data.recentOrders.map(o => `
+      <tr>
+        <td>${o.orderId}</td>
+        <td>${o.date}</td>
+        <td>${o.buyerName}</td>
+        <td>${o.phone}</td>
+        <td>${o.items} (qty: ${o.quantities})</td>
+        <td>${money(o.total)}</td>
+        <td>${o.paymentMethod || 'Pending'}</td>
+        <td>${o.notes || ''}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+document.getElementById('unlockBtn').addEventListener('click', unlock);
+document.getElementById('passwordInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') unlock();
+});
+document.getElementById('refreshBtn').addEventListener('click', refresh);
+</script>
+</body>
+</html>
