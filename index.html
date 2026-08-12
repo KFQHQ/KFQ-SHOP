@@ -31,11 +31,19 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    background: var(--bg);
+    background-image: linear-gradient(rgba(8,9,10,0.74), rgba(8,9,10,0.74)), url('./images/background.jpg');
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     color: var(--text);
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+  }
+  @media (max-width: 768px) {
+    /* background-attachment: fixed is unreliable/janky on many mobile browsers */
+    body { background-attachment: scroll; }
   }
 
   h1, h2, h3, .display {
@@ -63,32 +71,7 @@
   }
   button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  /* ---------- Ambient vapor background ---------- */
-  .vapor-field {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    overflow: hidden;
-  }
-  .vapor-blob {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(60px);
-    opacity: 0.28;
-    animation: drift 26s ease-in-out infinite;
-  }
-  .vapor-blob.b1 { width: 420px; height: 420px; background: var(--accent); top: -10%; left: -8%; animation-duration: 30s; }
-  .vapor-blob.b2 { width: 340px; height: 340px; background: var(--warm); top: 40%; right: -10%; animation-duration: 24s; animation-delay: -8s; }
-  .vapor-blob.b3 { width: 300px; height: 300px; background: #6C6FD9; bottom: -12%; left: 20%; animation-duration: 34s; animation-delay: -4s; }
-
-  @keyframes drift {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    33% { transform: translate(40px, 30px) scale(1.08); }
-    66% { transform: translate(-30px, 20px) scale(0.95); }
-  }
   @media (prefers-reduced-motion: reduce) {
-    .vapor-blob { animation: none; }
   }
 
   /* ---------- Layout shell ---------- */
@@ -511,7 +494,7 @@ input[type="number"] {
   position: fixed;
   bottom: 0px;
   left: 12px;
-  width: 150px;
+  width: 120px;
   height: auto;
   z-index: 30;
   pointer-events: none;
@@ -548,12 +531,6 @@ input[type="number"] {
 <body>
 
 <img src="./images/mascot.png" alt="" class="corner-mascot" aria-hidden="true">
-
-<div class="vapor-field">
-  <div class="vapor-blob b1"></div>
-  <div class="vapor-blob b2"></div>
-  <div class="vapor-blob b3"></div>
-</div>
 
 <div class="page">
   <header class="site" style="justify-content: flex-end; gap: 10px;">
