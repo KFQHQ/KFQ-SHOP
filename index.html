@@ -506,6 +506,22 @@ input[type="number"] {
   font-family: Arial, Helvetica, sans-serif !important;
 }
 
+/* Decorative fixed corner mascot — never intercepts clicks, purely cosmetic */
+.corner-mascot {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  width: 90px;
+  height: auto;
+  z-index: 30;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 4px 14px rgba(0,0,0,0.45));
+}
+@media (max-width: 480px) {
+  .corner-mascot { width: 64px; bottom: 10px; right: 10px; }
+}
+
 .payment-close-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -530,6 +546,8 @@ input[type="number"] {
 </style>
 </head>
 <body>
+
+<img src="./images/mascot.png" alt="" class="corner-mascot" aria-hidden="true">
 
 <div class="vapor-field">
   <div class="vapor-blob b1"></div>
