@@ -622,8 +622,8 @@ input[type="number"] {
         <input type="text" id="discountCode" placeholder="e.g. FIVEOFF">
       </div>
       <div class="field">
-        <label for="checkoutPin">Set a <span class="num-fallback">4</span>-digit PIN (optional — lets you look up your orders later)</label>
-        <input type="tel" id="checkoutPin" placeholder="1234" maxlength="4">
+        <label for="checkoutPin">Create a <span class="num-fallback">4</span>-digit PIN (required — lets you look up your orders later)</label>
+        <input type="tel" id="checkoutPin" placeholder="1234" maxlength="4" required>
       </div>
       <button class="primary-btn" id="placeOrderBtn">Place order</button>
       <button class="secondary-btn" id="cancelCheckoutBtn">Cancel</button>
@@ -1064,6 +1064,10 @@ placeOrderBtn.addEventListener('click', async () => {
 
   if (!buyerName || !phone) {
     checkoutError.innerHTML = '<div class="error-box">Name and phone number are required.</div>';
+    return;
+  }
+  if (!pin || !/^\d{4}$/.test(pin)) {
+    checkoutError.innerHTML = '<div class="error-box">Please create a PIN to place your order.</div>';
     return;
   }
   if (!cart.length) {
