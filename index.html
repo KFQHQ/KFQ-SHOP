@@ -640,6 +640,7 @@ input[type="number"] {
         <button class="pay-option" data-method="PayPal">PayPal</button>
         <button class="pay-option" data-method="Venmo">Venmo</button>
         <button class="pay-option" data-method="Cash App">Cash App</button>
+        <button class="pay-option" data-method="Zelle">Zelle</button>
         <button class="pay-option" data-method="Cash">Cash</button>
       </div>
       <div id="paymentDisplay"></div>
@@ -1142,6 +1143,10 @@ function buildPaymentLink(method, amount) {
       return 'venmo://paycharge?txn=pay&recipients=' + paymentHandles.venmo + '&amount=' + amt + '&note=' + note;
     case 'Cash App':
       return 'https://cash.app/$' + paymentHandles.cashapp.replace(/^\$/, '') + '/' + amt;
+    case 'Zelle':
+      // Zelle has no deep-link/URL scheme — this QR just encodes plain text
+      // the customer's scanner app will preview, not something that auto-opens.
+      return 'Send $' + amt + ' via Zelle to:\n' + paymentHandles.zelle;
     default:
       return '';
   }
@@ -1157,16 +1162,19 @@ function renderPaymentMethod(method) {
     setTimeout(() => { closeBtn.disabled = false; }, 2000);
     return;
   }
-  if (!paymentHandles.paypal && !paymentHandles.venmo && !paymentHandles.cashapp) {
+  if (!paymentHandles.paypal && !paymentHandles.venmo && !paymentHandles.cashapp && !paymentHandles.zelle) {
     display.innerHTML = '<div class="error-box">Payment handles unavailable — check API_BASE_URL / getConfig.</div>';
     closeBtn.disabled = false;
     return;
   }
   const link = buildPaymentLink(method, lastOrder.total);
+  const caption = method === 'Zelle'
+    ? 'Scan to see the Zelle payment details, then send it from your own banking app — Zelle doesn\'t support auto-filling like the others.'
+    : `Scan with your phone to open ${method} with the amount prefilled.${method === 'Venmo' ? '<br>On desktop this link only works if Venmo is installed on the device scanning it.' : ''}`;
   display.innerHTML = `
     <div class="qr-wrap">
       <div id="qrcode"></div>
-      <div class="qr-caption">Scan with your phone to open ${method} with the amount prefilled.<br>${method === 'Venmo' ? 'On desktop this link only works if Venmo is installed on the device scanning it.' : ''}</div>
+      <div class="qr-caption">${caption}</div>
     </div>
   `;
   new QRCode(document.getElementById('qrcode'), {
