@@ -1245,7 +1245,7 @@ function renderMyOrders(orders) {
         <span class="order-row-id">${o.orderId}</span>
         <span class="order-row-total">${money(o.total)}</span>
       </div>
-      <div class="order-row-meta">${o.date} · ${o.paymentMethod || 'Pending'}</div>
+      <div class="order-row-meta">${o.date} · ${o.paymentMethod || 'Pending'} · ${o.status || 'Pending'}</div>
       <div class="order-row-meta">${o.items} (qty: ${o.quantities})</div>
     </div>
   `).join('') + '<button class="secondary-btn" id="backToLookupBtn">Search again</button>';

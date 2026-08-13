@@ -99,6 +99,41 @@
 
   .empty { color: var(--text-dim); font-size: 0.85rem; padding: 12px 0; }
   #dashboardContent[hidden] { display: none; }
+
+  .status-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .status-badge.pending { background: rgba(232,150,60,0.18); color: var(--warm); }
+  .status-badge.confirmed { background: rgba(63,217,199,0.18); color: var(--accent); }
+  .status-badge.cancelled { background: rgba(225,85,63,0.18); color: var(--danger); }
+
+  .row-actions { display: flex; gap: 6px; }
+  .action-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .action-btn.confirm { background: var(--accent); color: #0A2320; }
+  .action-btn.cancel { background: var(--surface-raised); color: var(--danger); border: 1px solid var(--danger); }
+  .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .pending-alert {
+    background: rgba(232,150,60,0.12);
+    border: 1px solid var(--warm);
+    color: var(--warm);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+  }
 </style>
 </head>
 <body>
@@ -120,20 +155,39 @@
 
     <div class="stats-row">
       <div class="stat-card">
-        <div class="label">Orders today</div>
+        <div class="label">Awaiting confirmation</div>
+        <div class="value" id="pendingCount" style="color:var(--warm);">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Orders today (confirmed)</div>
         <div class="value" id="todayCount">-</div>
       </div>
       <div class="stat-card">
-        <div class="label">Revenue today</div>
+        <div class="label">Revenue today (confirmed)</div>
         <div class="value" id="todayTotal">-</div>
       </div>
       <div class="stat-card">
-        <div class="label">Orders this week</div>
+        <div class="label">Orders this week (confirmed)</div>
         <div class="value" id="weekCount">-</div>
       </div>
       <div class="stat-card">
-        <div class="label">Revenue this week</div>
+        <div class="label">Revenue this week (confirmed)</div>
         <div class="value" id="weekTotal">-</div>
+      </div>
+    </div>
+
+    <div class="section" id="pendingSection">
+      <div class="section-head"><h2 style="font-size:1.05rem;">Needs confirmation</h2></div>
+      <div id="pendingAlert"></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Order</th><th>Date</th><th>Buyer</th><th>Phone</th><th>Items</th><th>Total</th><th>Payment</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="pendingTableBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -148,7 +202,7 @@
         <table>
           <thead>
             <tr>
-              <th>Order</th><th>Date</th><th>Buyer</th><th>Phone</th><th>Items</th><th>Total</th><th>Payment</th><th>Notes</th>
+              <th>Order</th><th>Date</th><th>Buyer</th><th>Phone</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Notes</th>
             </tr>
           </thead>
           <tbody id="ordersTableBody"></tbody>
@@ -196,11 +250,48 @@ async function refresh() {
   if (!result.error) renderDashboard(result);
 }
 
+function statusBadge(status) {
+  const s = (status || 'Pending').toLowerCase();
+  return `<span class="status-badge ${s}">${status || 'Pending'}</span>`;
+}
+
 function renderDashboard(data) {
+  document.getElementById('pendingCount').textContent = data.pendingCount;
   document.getElementById('todayCount').textContent = data.todayCount;
   document.getElementById('todayTotal').textContent = money(data.todayTotal);
   document.getElementById('weekCount').textContent = data.weekCount;
   document.getElementById('weekTotal').textContent = money(data.weekTotal);
+
+  const pendingAlert = document.getElementById('pendingAlert');
+  pendingAlert.innerHTML = data.pendingCount > 0
+    ? `<div class="pending-alert">${data.pendingCount} order${data.pendingCount === 1 ? '' : 's'} waiting on you to confirm payment actually came in.</div>`
+    : '';
+
+  const pendingBody = document.getElementById('pendingTableBody');
+  if (!data.pendingOrders.length) {
+    pendingBody.innerHTML = '<tr><td colspan="8" class="empty">Nothing waiting on you right now.</td></tr>';
+  } else {
+    pendingBody.innerHTML = data.pendingOrders.map(o => `
+      <tr>
+        <td>${o.orderId}</td>
+        <td>${o.date}</td>
+        <td>${o.buyerName}</td>
+        <td>${o.phone}</td>
+        <td>${o.items} (qty: ${o.quantities})</td>
+        <td>${money(o.total)}</td>
+        <td>${o.paymentMethod || 'Pending'}</td>
+        <td>
+          <div class="row-actions">
+            <button class="action-btn confirm" data-order="${o.orderId}" data-action="confirm">Confirm</button>
+            <button class="action-btn cancel" data-order="${o.orderId}" data-action="cancel">Cancel</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+    pendingBody.querySelectorAll('.action-btn').forEach(btn => {
+      btn.addEventListener('click', () => handleOrderAction(btn.dataset.order, btn.dataset.action, btn));
+    });
+  }
 
   const lowStockList = document.getElementById('lowStockList');
   if (!data.lowStock.length) {
@@ -216,7 +307,7 @@ function renderDashboard(data) {
 
   const tbody = document.getElementById('ordersTableBody');
   if (!data.recentOrders.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">No orders yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No orders yet.</td></tr>';
   } else {
     tbody.innerHTML = data.recentOrders.map(o => `
       <tr>
@@ -227,10 +318,32 @@ function renderDashboard(data) {
         <td>${o.items} (qty: ${o.quantities})</td>
         <td>${money(o.total)}</td>
         <td>${o.paymentMethod || 'Pending'}</td>
+        <td>${statusBadge(o.status)}</td>
         <td>${o.notes || ''}</td>
       </tr>
     `).join('');
   }
+}
+
+async function handleOrderAction(orderId, action, btn) {
+  const row = btn.closest('tr');
+  row.querySelectorAll('.action-btn').forEach(b => b.disabled = true);
+
+  if (action === 'cancel' && !confirm('Cancel order ' + orderId + '? This cannot be undone from here.')) {
+    row.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
+    return;
+  }
+
+  const apiAction = action === 'confirm' ? 'confirmOrder' : 'cancelOrder';
+  const result = await apiPost({ action: apiAction, orderId: orderId, password: dashboardPassword });
+
+  if (result.error) {
+    alert(result.error);
+    row.querySelectorAll('.action-btn').forEach(b => b.disabled = false);
+    return;
+  }
+
+  refresh();
 }
 
 document.getElementById('unlockBtn').addEventListener('click', unlock);
