@@ -230,7 +230,7 @@ function formatItemsList(itemsStr, quantitiesStr) {
   const items = String(itemsStr || '').split(', ').filter(Boolean);
   const quantities = String(quantitiesStr || '').split(',').map(q => q.trim()).filter(Boolean);
   if (!items.length) return '';
-  return items.map((item, i) => escapeHtml(item) + ' ×' + (quantities[i] || '?')).join('<br>');
+  return items.map((item, i) => escapeHtml(item) + ' ×' + (quantities[i] || '?')).join('<br><br>');
 }
 
 function escapeHtml(value) {
