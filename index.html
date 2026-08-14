@@ -508,24 +508,23 @@ input[type="number"] {
 
 .unlock-toast {
   position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
   background: var(--surface-raised);
   border: 1px solid var(--accent);
   color: var(--accent);
-  padding: 12px 20px;
-  border-radius: 999px;
+  padding: 12px 18px;
+  border-radius: 16px;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  max-width: 240px;
+  text-align: center;
   z-index: 60;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   animation: toastPop 0.25s ease;
 }
 .unlock-toast[hidden] { display: none; }
 @keyframes toastPop {
-  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .secret-section-head {
@@ -534,7 +533,9 @@ input[type="number"] {
   gap: 10px;
   margin: 40px 0 12px;
 }
+.secret-section-head[hidden] { display: none; }
 .secret-section-head h2 { font-size: 1.2rem; color: var(--accent); }
+#secretGrid[hidden] { display: none; }
 .secret-badge {
   background: rgba(63,217,199,0.15);
   color: var(--accent);
@@ -1357,7 +1358,19 @@ async function unlockSecretListings(silent) {
 
 function showUnlockToast() {
   unlockToast.textContent = 'Ah, I see you have elite ball knowledge >:)';
-  unlockToast.hidden = false;
+  unlockToast.style.left = '0px';
+  unlockToast.hidden = false; // must be visible to measure its rendered size
+
+  const mascotRect = mascotEasterEgg.getBoundingClientRect();
+  const toastRect = unlockToast.getBoundingClientRect();
+  const margin = 8;
+
+  let left = mascotRect.left + (mascotRect.width / 2) - (toastRect.width / 2);
+  left = Math.max(margin, Math.min(left, window.innerWidth - toastRect.width - margin));
+
+  unlockToast.style.left = left + 'px';
+  unlockToast.style.bottom = (window.innerHeight - mascotRect.top + 12) + 'px';
+
   setTimeout(() => { unlockToast.hidden = true; }, 3500);
 }
 
