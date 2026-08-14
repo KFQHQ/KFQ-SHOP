@@ -489,7 +489,8 @@ input[type="number"] {
   font-family: Arial, Helvetica, sans-serif !important;
 }
 
-/* Decorative fixed corner mascot — never intercepts clicks, purely cosmetic */
+/* Fixed corner mascot. Was purely decorative; now doubles as a 5-click easter
+   egg trigger for secret listings, so it needs to actually receive clicks. */
 .corner-mascot {
   position: fixed;
   bottom: 0px;
@@ -497,12 +498,51 @@ input[type="number"] {
   width: 120px;
   height: auto;
   z-index: 30;
-  pointer-events: none;
+  cursor: pointer;
   user-select: none;
   filter: drop-shadow(0 4px 14px rgba(0,0,0,0.45));
 }
 @media (max-width: 480px) {
   .corner-mascot { width: 90px; bottom: 0px; left: 8px; }
+}
+
+.unlock-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-raised);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  z-index: 60;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  animation: toastPop 0.25s ease;
+}
+.unlock-toast[hidden] { display: none; }
+@keyframes toastPop {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.secret-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 40px 0 12px;
+}
+.secret-section-head h2 { font-size: 1.2rem; color: var(--accent); }
+.secret-badge {
+  background: rgba(63,217,199,0.15);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .payment-close-btn:disabled {
@@ -530,7 +570,9 @@ input[type="number"] {
 </head>
 <body>
 
-<img src="./images/mascot.png" alt="" class="corner-mascot" aria-hidden="true">
+<img src="./images/mascot.png" alt="Mascot" class="corner-mascot" id="mascotEasterEgg" role="button" tabindex="0" aria-label="Mascot">
+
+<div class="unlock-toast" id="unlockToast" hidden></div>
 
 <div class="page">
   <header class="site" style="justify-content: flex-end; gap: 10px;">
@@ -547,6 +589,12 @@ input[type="number"] {
 
   <div id="productGrid" class="grid"></div>
   <div id="emptyState" class="empty-state" hidden>Nothing in stock right now — check back soon.</div>
+
+  <div class="secret-section-head" id="secretSectionHead" hidden>
+    <h2>Secret Listings</h2>
+    <span class="secret-badge">Unlocked</span>
+  </div>
+  <div id="secretGrid" class="grid" hidden></div>
 
 </div>
 <!-- Grouped-product selector -->
@@ -1267,6 +1315,116 @@ function renderMyOrders(orders) {
     myOrdersForm.hidden = false;
   });
 }
+
+/* ------------------------------------------------------------------------
+   Secret listings — click the corner mascot 5 times to unlock.
+   NOTE: this is casual gating for a fun easter egg, not real access control.
+   The site token sent to getSecretProducts lives in this file's source, same
+   as every other write action — anyone who reads the page source could call
+   it directly. The point is to keep secret products out of the normal
+   getProducts payload and out of casual view, not to secure them.
+   ------------------------------------------------------------------------ */
+const SECRET_UNLOCK_KEY = 'kfq_secret_unlocked';
+let secretClickCount = 0;
+let secretUnlocked = localStorage.getItem(SECRET_UNLOCK_KEY) === 'true';
+
+const mascotEasterEgg = document.getElementById('mascotEasterEgg');
+const unlockToast = document.getElementById('unlockToast');
+const secretSectionHead = document.getElementById('secretSectionHead');
+const secretGrid = document.getElementById('secretGrid');
+
+function handleMascotActivate() {
+  if (secretUnlocked) return;
+  secretClickCount++;
+  if (secretClickCount >= 5) {
+    unlockSecretListings();
+  }
+}
+mascotEasterEgg.addEventListener('click', handleMascotActivate);
+mascotEasterEgg.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    handleMascotActivate();
+  }
+});
+
+async function unlockSecretListings(silent) {
+  secretUnlocked = true;
+  localStorage.setItem(SECRET_UNLOCK_KEY, 'true');
+  if (!silent) showUnlockToast();
+  await loadSecretProducts();
+}
+
+function showUnlockToast() {
+  unlockToast.textContent = 'Ah, I see you have elite ball knowledge >:)';
+  unlockToast.hidden = false;
+  setTimeout(() => { unlockToast.hidden = true; }, 3500);
+}
+
+async function loadSecretProducts() {
+  try {
+    const secretProducts = await apiPost({ action: 'getSecretProducts' });
+    if (secretProducts.error) return; // fail quietly — this is a fun extra, not core functionality
+    renderSecretProducts(secretProducts);
+  } catch (err) {
+    // Fail quietly here too.
+  }
+}
+
+function renderSecretProducts(secretProducts) {
+  const inStock = secretProducts.filter(p => Number(p.quantity) > 0);
+  if (!inStock.length) return;
+
+  secretSectionHead.hidden = false;
+  secretGrid.hidden = false;
+  secretGrid.innerHTML = inStock.map(p => {
+    const img = toDriveDirectLink(p.imageUrl);
+    return `
+      <div class="card">
+        <div class="puff"></div>
+        <div class="card-img">
+          ${img ? `<img src="${img}" alt="${safeText(p.name)}" loading="lazy">` : `<span class="placeholder">No image</span>`}
+        </div>
+        <div class="card-body">
+          <h3>${safeText(p.name)}</h3>
+          <div class="flavor">${safeText(p.flavor || '')}</div>
+          <div class="card-foot">
+            <span class="price mono">${money(p.price)}</span>
+            <button class="add-btn" data-sku="${p.sku}">Add</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  secretGrid.querySelectorAll('.add-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const product = inStock.find(p => p.sku === btn.dataset.sku);
+      if (product) addToCart(product);
+    });
+  });
+}
+
+// Restore silently across refreshes/visits if already unlocked — no toast replay.
+if (secretUnlocked) {
+  loadSecretProducts();
+}
+
+/**
+ * DEV-ONLY reset, not linked from any visible button or menu — nothing in the
+ * UI exposes this to customers. To reset during testing, open the browser
+ * console (F12) on this page and run:
+ *   kfqResetSecretUnlock()
+ */
+window.kfqResetSecretUnlock = function () {
+  localStorage.removeItem(SECRET_UNLOCK_KEY);
+  secretUnlocked = false;
+  secretClickCount = 0;
+  secretSectionHead.hidden = true;
+  secretGrid.hidden = true;
+  secretGrid.innerHTML = '';
+  console.log('Secret listings unlock has been reset.');
+};
 </script>
 </body>
 </html>
