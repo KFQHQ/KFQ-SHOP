@@ -794,6 +794,15 @@ function safeText(value) {
   return escapeHtml(value).replace(/\d+/g, '<span class="num-fallback">$&</span>');
 }
 
+// Items and quantities are stored as parallel comma-separated lists — this
+// zips them back into one line per item instead of two separate comma-blobs.
+function formatItemsList(itemsStr, quantitiesStr) {
+  const items = String(itemsStr || '').split(', ').filter(Boolean);
+  const quantities = String(quantitiesStr || '').split(',').map(q => q.trim()).filter(Boolean);
+  if (!items.length) return '';
+  return items.map((item, i) => safeText(item) + ' ×' + safeText(quantities[i] || '?')).join('<br>');
+}
+
 function renderCatalog() {
   productGrid.innerHTML = '';
 
@@ -1307,7 +1316,7 @@ function renderMyOrders(orders) {
         <span class="order-row-total">${money(o.total)}</span>
       </div>
       <div class="order-row-meta">${o.date} · ${o.paymentMethod || 'Pending'} · ${o.status || 'Pending'}</div>
-      <div class="order-row-meta">${o.items} (qty: ${o.quantities})</div>
+      <div class="order-row-meta">${formatItemsList(o.items, o.quantities)}</div>
     </div>
   `).join('') + '<button class="secondary-btn" id="backToLookupBtn">Search again</button>';
 
