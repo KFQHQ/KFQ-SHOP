@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KFQ Shop — Inventory Scan</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #101214;
+    --surface: #1B1E22;
+    --surface-raised: #24282D;
+    --border: #303539;
+    --text: #EDEAE3;
+    --text-dim: #9A9C9E;
+    --accent: #3FD9C7;
+    --warm: #E8963C;
+    --danger: #E1553F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; }
+  h1, h2 { margin: 0 0 4px; }
+
+  .gate {
+    max-width: 360px;
+    margin: 100px auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    text-align: center;
+  }
+  input {
+    width: 100%;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 1.05rem;
+    margin: 10px 0;
+  }
+  label { display: block; font-size: 0.8rem; color: var(--text-dim); margin: 12px 0 4px; }
+  button {
+    background: var(--accent);
+    color: #0A2320;
+    font-weight: 700;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+  button.secondary {
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  button.danger {
+    background: var(--surface-raised);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-row button { flex: 1; }
+
+  .error { color: #F3A99A; font-size: 0.85rem; margin-top: 8px; }
+  .success { color: var(--accent); font-size: 0.85rem; margin-top: 8px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-top: 16px;
+  }
+  .product-name { font-size: 1.2rem; font-weight: 700; }
+  .product-flavor { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 10px; }
+  .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .label { color: var(--text-dim); }
+  .stat-row .value.low { color: var(--danger); font-weight: 700; }
+
+  .mode-tabs { display: flex; gap: 8px; margin: 16px 0 10px; }
+  .mode-tab {
+    flex: 1;
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mode-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(63,217,199,0.1); }
+
+  .preview { font-size: 0.9rem; color: var(--text-dim); margin: 8px 0 14px; }
+  .preview strong { color: var(--text); }
+
+  #scanner { margin: 14px 0; border-radius: 10px; overflow: hidden; }
+  .hidden { display: none !important; }
+
+  .new-item-form .field { margin-bottom: 4px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 0.9rem; }
+  .checkbox-row input { width: auto; margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="gate" id="gate">
+    <h2>Inventory Scan</h2>
+    <p style="color:var(--text-dim); font-size:0.85rem;">Owner access only.</p>
+    <input type="password" id="passwordInput" placeholder="Password">
+    <button id="unlockBtn">Unlock</button>
+    <div class="error" id="gateError"></div>
+  </div>
+
+  <div id="toolContent" class="hidden">
+    <h1>Inventory Scan</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem;">Scan or type a SKU to look it up.</p>
+
+    <label for="skuInput">SKU</label>
+    <input type="text" id="skuInput" placeholder="e.g. TERPBLAST-KFQ" autofocus>
+    <div class="btn-row">
+      <button id="lookupBtn">Look Up</button>
+      <button class="secondary" id="scanBtn">Scan</button>
+    </div>
+    <div id="scanner" class="hidden"></div>
+    <div class="error" id="lookupError"></div>
+
+    <div id="resultArea"></div>
+  </div>
+
+</div>
+
+<script>
+const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xscd7fTE5PpPWYGz8gdiTd-dTVwatXdXGzGJIKurl_ljUyyjI-IAQg/exec";
+
+let dashboardPassword = '';
+let html5QrScanner = null;
+let currentProduct = null;
+let currentMode = 'add';
+
+async function apiPost(body) {
+  const res = await fetch(API_BASE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+function escapeHtml(value) {
+  const div = document.createElement('div');
+  div.textContent = String(value || '');
+  return div.innerHTML;
+}
+
+/* ---------------- Password gate ---------------- */
+async function unlock() {
+  const pw = document.getElementById('passwordInput').value;
+  const errorEl = document.getElementById('gateError');
+  errorEl.textContent = '';
+
+  const result = await apiPost({ action: 'getDashboardData', password: pw });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  dashboardPassword = pw;
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('toolContent').classList.remove('hidden');
+  document.getElementById('skuInput').focus();
+}
+
+document.getElementById('unlockBtn').addEventListener('click', unlock);
+document.getElementById('passwordInput').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+
+/* ---------------- Lookup ---------------- */
+document.getElementById('lookupBtn').addEventListener('click', doLookup);
+document.getElementById('skuInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLookup(); });
+
+async function doLookup() {
+  const sku = document.getElementById('skuInput').value.trim();
+  const errorEl = document.getElementById('lookupError');
+  errorEl.textContent = '';
+  document.getElementById('resultArea').innerHTML = '';
+  if (!sku) return;
+
+  const result = await apiPost({ action: 'lookupProductForInventory', sku: sku, password: dashboardPassword });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  if (result.found) {
+    currentProduct = result.product;
+    renderFoundProduct();
+  } else {
+    renderNotFound(sku);
+  }
+}
+
+/* ---------------- Found: adjust quantity ---------------- */
+function renderFoundProduct() {
+  const p = currentProduct;
+  currentMode = 'add';
+  const isLow = p.quantity <= p.lowStockThreshold;
+
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card">
+      <div class="product-name">${escapeHtml(p.name)}</div>
+      <div class="product-flavor">${escapeHtml(p.flavor || '')}</div>
+      <div class="stat-row"><span class="label">Current stock</span><span class="value ${isLow ? 'low' : ''}" id="currentQtyDisplay">${p.quantity}</span></div>
+      <div class="stat-row"><span class="label">Low stock threshold</span><span>${p.lowStockThreshold}</span></div>
+      <div class="stat-row"><span class="label">Price</span><span>$${Number(p.price).toFixed(2)}</span></div>
+      <div class="stat-row"><span class="label">Active</span><span>${p.active ? 'Yes' : 'No'}</span></div>
+
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="add">Add</button>
+        <button class="mode-tab" data-mode="remove">Remove</button>
+        <button class="mode-tab" data-mode="set">Set exact</button>
+      </div>
+
+      <label for="amountInput" id="amountLabel">Amount to add</label>
+      <input type="number" id="amountInput" min="0" placeholder="0">
+      <div class="preview" id="preview">New quantity will be: <strong>${p.quantity}</strong></div>
+
+      <button id="applyBtn">Apply</button>
+      <div class="error" id="applyError"></div>
+      <div class="success" id="applySuccess"></div>
+    </div>
+  `;
+
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentMode = tab.dataset.mode;
+      const labelMap = { add: 'Amount to add', remove: 'Amount to remove', set: 'New exact quantity' };
+      document.getElementById('amountLabel').textContent = labelMap[currentMode];
+      updatePreview();
+    });
+  });
+
+  document.getElementById('amountInput').addEventListener('input', updatePreview);
+  document.getElementById('applyBtn').addEventListener('click', applyAdjustment);
+}
+
+function updatePreview() {
+  const amt = Number(document.getElementById('amountInput').value) || 0;
+  let newQty = currentProduct.quantity;
+  if (currentMode === 'add') newQty = currentProduct.quantity + amt;
+  else if (currentMode === 'remove') newQty = Math.max(0, currentProduct.quantity - amt);
+  else if (currentMode === 'set') newQty = amt;
+  document.getElementById('preview').innerHTML = 'New quantity will be: <strong>' + newQty + '</strong>';
+}
+
+async function applyAdjustment() {
+  const amt = document.getElementById('amountInput').value;
+  const applyError = document.getElementById('applyError');
+  const applySuccess = document.getElementById('applySuccess');
+  applyError.textContent = '';
+  applySuccess.textContent = '';
+
+  if (amt === '' || Number(amt) < 0) {
+    applyError.textContent = 'Enter a valid amount.';
+    return;
+  }
+
+  const result = await apiPost({
+    action: 'adjustInventoryQuantity',
+    sku: currentProduct.sku,
+    mode: currentMode,
+    amount: amt,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    applyError.textContent = result.error;
+    return;
+  }
+
+  applySuccess.textContent = 'Updated — new quantity: ' + result.quantity;
+  currentProduct.quantity = result.quantity;
+  document.getElementById('currentQtyDisplay').textContent = result.quantity;
+  document.getElementById('amountInput').value = '';
+  updatePreview();
+
+  // Rapid-fire workflow: clear SKU and refocus after a short pause so the
+  // success message is visible before moving to the next scan.
+  setTimeout(() => {
+    document.getElementById('skuInput').value = '';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('skuInput').focus();
+  }, 1400);
+}
+
+/* ---------------- Not found: add new item ---------------- */
+function renderNotFound(sku) {
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card">
+      <p>SKU <strong>${escapeHtml(sku)}</strong> was not found.</p>
+      <p style="color:var(--text-dim); font-size:0.85rem;">Add it as a new product?</p>
+      <div class="btn-row">
+        <button id="addNewYesBtn">Yes, add it</button>
+        <button class="secondary" id="addNewNoBtn">No</button>
+      </div>
+      <div id="newItemFormArea"></div>
+    </div>
+  `;
+  document.getElementById('addNewNoBtn').addEventListener('click', () => {
+    document.getElementById('resultArea').innerHTML = '';
+  });
+  document.getElementById('addNewYesBtn').addEventListener('click', () => renderNewItemForm(sku));
+}
+
+function renderNewItemForm(sku) {
+  document.getElementById('newItemFormArea').innerHTML = `
+    <div class="new-item-form">
+      <label>Product Name</label>
+      <input type="text" id="newName">
+      <label>Flavor</label>
+      <input type="text" id="newFlavor">
+      <label>Price</label>
+      <input type="number" id="newPrice" min="0" step="0.01">
+      <label>Initial Quantity</label>
+      <input type="number" id="newQuantity" min="0" value="0">
+      <label>Low Stock Threshold</label>
+      <input type="number" id="newThreshold" min="0" value="5">
+      <label>Image URL (optional)</label>
+      <input type="text" id="newImageUrl">
+      <div class="checkbox-row">
+        <input type="checkbox" id="newActive">
+        <label style="margin:0;">Active (visible on the storefront) — off by default</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="newSecret">
+        <label style="margin:0;">Secret listing</label>
+      </div>
+      <button id="submitNewItemBtn" style="margin-top:10px;">Add Product</button>
+      <div class="error" id="newItemError"></div>
+      <div class="success" id="newItemSuccess"></div>
+    </div>
+  `;
+  document.getElementById('submitNewItemBtn').addEventListener('click', () => submitNewItem(sku));
+}
+
+async function submitNewItem(sku) {
+  const errorEl = document.getElementById('newItemError');
+  const successEl = document.getElementById('newItemSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const name = document.getElementById('newName').value.trim();
+  if (!name) {
+    errorEl.textContent = 'Product name is required.';
+    return;
+  }
+
+  const fields = {
+    sku: sku,
+    name: name,
+    flavor: document.getElementById('newFlavor').value.trim(),
+    price: document.getElementById('newPrice').value,
+    quantity: document.getElementById('newQuantity').value,
+    lowStockThreshold: document.getElementById('newThreshold').value,
+    imageUrl: document.getElementById('newImageUrl').value.trim(),
+    active: document.getElementById('newActive').checked,
+    secret: document.getElementById('newSecret').checked
+  };
+
+  const result = await apiPost({ action: 'addNewInventoryItem', fields: fields, password: dashboardPassword });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  successEl.textContent = 'Added! You can now scan it normally.';
+  setTimeout(() => {
+    document.getElementById('skuInput').value = '';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('skuInput').focus();
+  }, 1400);
+}
+
+/* ---------------- Camera scanning ---------------- */
+document.getElementById('scanBtn').addEventListener('click', toggleScanner);
+
+function toggleScanner() {
+  const scannerEl = document.getElementById('scanner');
+  if (html5QrScanner) {
+    stopScanner();
+    return;
+  }
+  scannerEl.classList.remove('hidden');
+  html5QrScanner = new Html5Qrcode('scanner');
+  html5QrScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: 220 },
+    (decodedText) => {
+      document.getElementById('skuInput').value = decodedText.trim();
+      stopScanner();
+      doLookup();
+    },
+    () => { /* ignore per-frame scan misses */ }
+  ).catch(err => {
+    document.getElementById('lookupError').textContent = 'Could not start camera: ' + err;
+    scannerEl.classList.add('hidden');
+    html5QrScanner = null;
+  });
+}
+
+function stopScanner() {
+  if (!html5QrScanner) return;
+  html5QrScanner.stop().then(() => {
+    html5QrScanner.clear();
+    html5QrScanner = null;
+    document.getElementById('scanner').classList.add('hidden');
+  }).catch(() => {
+    html5QrScanner = null;
+    document.getElementById('scanner').classList.add('hidden');
+  });
+}
+</script>
+</body>
+</html>
