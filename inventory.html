@@ -85,6 +85,32 @@
   }
   .product-name { font-size: 1.2rem; font-weight: 700; }
   .product-flavor { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 10px; }
+  .product-img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    background: var(--surface-raised);
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .active-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 14px 0;
+    font-size: 0.9rem;
+  }
+  .active-toggle-row button {
+    width: auto;
+    padding: 7px 16px;
+    font-size: 0.82rem;
+  }
+  .active-toggle-row button.is-active { background: var(--accent); color: #0A2320; }
+  .active-toggle-row button.is-inactive { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
   .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
   .stat-row:last-child { border-bottom: none; }
   .stat-row .label { color: var(--text-dim); }
@@ -167,6 +193,17 @@ function escapeHtml(value) {
   return div.innerHTML;
 }
 
+// Same conversion used on the main storefront — turns a Drive "share" link
+// into something actually viewable as an <img> src.
+function toDriveDirectLink(url) {
+  if (!url) return '';
+  const match = String(url).match(/\/file\/d\/([^/]+)/);
+  if (match) {
+    return 'https://drive.google.com/thumbnail?id=' + match[1] + '&sz=w1000';
+  }
+  return url;
+}
+
 /* ---------------- Password gate ---------------- */
 async function unlock() {
   const pw = document.getElementById('passwordInput').value;
@@ -218,15 +255,22 @@ function renderFoundProduct() {
   const p = currentProduct;
   currentMode = 'add';
   const isLow = p.quantity <= p.lowStockThreshold;
+  const img = toDriveDirectLink(p.imageUrl);
 
   document.getElementById('resultArea').innerHTML = `
     <div class="card">
+      ${img ? `<img src="${img}" alt="${escapeHtml(p.name)}" class="product-img">` : ''}
       <div class="product-name">${escapeHtml(p.name)}</div>
       <div class="product-flavor">${escapeHtml(p.flavor || '')}</div>
       <div class="stat-row"><span class="label">Current stock</span><span class="value ${isLow ? 'low' : ''}" id="currentQtyDisplay">${p.quantity}</span></div>
       <div class="stat-row"><span class="label">Low stock threshold</span><span>${p.lowStockThreshold}</span></div>
       <div class="stat-row"><span class="label">Price</span><span>$${Number(p.price).toFixed(2)}</span></div>
-      <div class="stat-row"><span class="label">Active</span><span>${p.active ? 'Yes' : 'No'}</span></div>
+
+      <div class="active-toggle-row">
+        <span>Status: <strong id="activeStatusText">${p.active ? 'Active' : 'Inactive'}</strong></span>
+        <button id="toggleActiveBtn" class="${p.active ? 'is-active' : 'is-inactive'}">${p.active ? 'Deactivate' : 'Activate'}</button>
+      </div>
+      <div class="error" id="toggleActiveError"></div>
 
       <div class="mode-tabs">
         <button class="mode-tab active" data-mode="add">Add</button>
@@ -244,6 +288,8 @@ function renderFoundProduct() {
     </div>
   `;
 
+  document.getElementById('toggleActiveBtn').addEventListener('click', toggleActiveStatus);
+
   document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
@@ -257,6 +303,30 @@ function renderFoundProduct() {
 
   document.getElementById('amountInput').addEventListener('input', updatePreview);
   document.getElementById('applyBtn').addEventListener('click', applyAdjustment);
+}
+
+async function toggleActiveStatus() {
+  const errorEl = document.getElementById('toggleActiveError');
+  errorEl.textContent = '';
+  const newActive = !currentProduct.active;
+
+  const result = await apiPost({
+    action: 'setProductActive',
+    sku: currentProduct.sku,
+    active: newActive,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  currentProduct.active = newActive;
+  document.getElementById('activeStatusText').textContent = newActive ? 'Active' : 'Inactive';
+  const btn = document.getElementById('toggleActiveBtn');
+  btn.textContent = newActive ? 'Deactivate' : 'Activate';
+  btn.className = newActive ? 'is-active' : 'is-inactive';
 }
 
 function updatePreview() {
