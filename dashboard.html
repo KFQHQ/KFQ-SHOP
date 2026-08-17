@@ -96,6 +96,62 @@
   }
   .low-stock-item:last-child { border-bottom: none; }
   .low-stock-item .qty { color: var(--danger); font-weight: 700; }
+  .low-stock-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .low-stock-item .low-stock-info { display: flex; flex-direction: column; gap: 2px; }
+
+  .quick-order-btn {
+    background: var(--surface-raised);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .quick-order-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .quick-order-note { font-size: 0.72rem; color: var(--text-dim); }
+
+  .reorder-item {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .reorder-item-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .reorder-item-name { font-weight: 700; font-size: 0.9rem; }
+  .reorder-item-meta { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 8px; }
+  .reorder-status-select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    color: var(--text);
+    font-size: 0.8rem;
+  }
+  .reorder-note-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    color: var(--text);
+    font-size: 0.8rem;
+    width: 100%;
+    margin-top: 6px;
+  }
+  .reorder-controls { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+  .reorder-controls button {
+    background: var(--accent);
+    color: #0A2320;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
 
   .empty { color: var(--text-dim); font-size: 0.85rem; padding: 12px 0; }
   #dashboardContent[hidden] { display: none; }
@@ -308,6 +364,11 @@
     </div>
 
     <div class="section">
+      <div class="section-head"><h2 style="font-size:1.05rem;">Reorder list</h2></div>
+      <div id="reorderList"></div>
+    </div>
+
+    <div class="section">
       <div class="section-head"><h2 style="font-size:1.05rem;">Recent orders</h2></div>
       <div style="overflow-x:auto;">
         <table>
@@ -475,11 +536,19 @@ function renderDashboard(data) {
   } else {
     lowStockList.innerHTML = data.lowStock.map(p => `
       <div class="low-stock-item">
-        <span>${p.name}${p.flavor ? ' — ' + p.flavor : ''}</span>
-        <span class="qty">${p.quantity} left (threshold ${p.threshold})</span>
+        <div class="low-stock-info">
+          <span>${p.name}${p.flavor ? ' — ' + p.flavor : ''}</span>
+          <span class="qty">${p.quantity} left (threshold ${p.threshold})</span>
+        </div>
+        <button class="quick-order-btn" data-sku="${p.sku}">Quick Order</button>
       </div>
     `).join('');
+    lowStockList.querySelectorAll('.quick-order-btn').forEach(btn => {
+      btn.addEventListener('click', () => quickOrder(btn.dataset.sku, btn));
+    });
   }
+
+  renderReorderList(data.reorderList || []);
 
   const tbody = document.getElementById('ordersTableBody');
   if (!data.recentOrders.length) {
@@ -499,6 +568,70 @@ function renderDashboard(data) {
       </tr>
     `).join('');
   }
+}
+
+async function quickOrder(sku, btn) {
+  btn.disabled = true;
+  const result = await apiPost({ action: 'quickOrderLowStock', sku: sku, password: dashboardPassword });
+  if (result.error) {
+    alert(result.error);
+    btn.disabled = false;
+    return;
+  }
+  btn.textContent = result.alreadyExists ? 'Already listed' : 'Added ✓';
+  refresh();
+}
+
+function renderReorderList(list) {
+  const container = document.getElementById('reorderList');
+  if (!list.length) {
+    container.innerHTML = '<div class="empty">Nothing on the reorder list right now.</div>';
+    return;
+  }
+  container.innerHTML = list.map(item => `
+    <div class="reorder-item">
+      <div class="reorder-item-top">
+        <span class="reorder-item-name">${item.name}${item.flavor ? ' — ' + item.flavor : ''}</span>
+        <span>Suggested: ${item.suggestedQty}</span>
+      </div>
+      <div class="reorder-item-meta">Flagged ${item.timestampAdded} · was ${item.qtyWhenFlagged} left (threshold ${item.threshold})</div>
+      <select class="reorder-status-select" data-sku="${item.sku}" data-added="${item.timestampAdded}">
+        <option value="Needed" ${item.status === 'Needed' ? 'selected' : ''}>Needed</option>
+        <option value="Ordered" ${item.status === 'Ordered' ? 'selected' : ''}>Ordered</option>
+        <option value="Received" ${item.status === 'Received' ? 'selected' : ''}>Received</option>
+      </select>
+      <input type="text" class="reorder-note-input" placeholder="Note (optional)" value="${item.note ? item.note.replace(/"/g, '&quot;') : ''}" data-sku="${item.sku}" data-added="${item.timestampAdded}">
+      <div class="reorder-controls">
+        <button data-sku="${item.sku}" data-added="${item.timestampAdded}">Save</button>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.reorder-controls button').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const sku = btn.dataset.sku;
+      const added = btn.dataset.added;
+      const status = container.querySelector(`.reorder-status-select[data-sku="${sku}"][data-added="${added}"]`).value;
+      const note = container.querySelector(`.reorder-note-input[data-sku="${sku}"][data-added="${added}"]`).value;
+
+      btn.disabled = true;
+      const result = await apiPost({
+        action: 'markReorderStatus',
+        sku: sku,
+        timestampAdded: added,
+        newStatus: status,
+        note: note,
+        password: dashboardPassword
+      });
+      btn.disabled = false;
+
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+      refresh();
+    });
+  });
 }
 
 async function handleOrderAction(orderId, action, btn) {
