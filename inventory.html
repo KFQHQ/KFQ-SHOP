@@ -37,16 +37,17 @@
     padding: 28px;
     text-align: center;
   }
-  input {
-    width: 100%;
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
-    color: var(--text);
-    font-size: 1.05rem;
-    margin: 10px 0;
-  }
+input,
+select {
+  width: 100%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 1.05rem;
+  margin: 10px 0;
+}
   label { display: block; font-size: 0.8rem; color: var(--text-dim); margin: 12px 0 4px; }
   button {
     background: var(--accent);
@@ -309,25 +310,35 @@ function renderFoundProduct() {
         <button class="mode-tab" data-mode="set">Set exact</button>
       </div>
 
-      <label for="amountInput" id="amountLabel">Amount to add</label>
-      <input type="number" id="amountInput" min="0" placeholder="0">
-      <div class="preview" id="preview">New quantity will be: <strong>${p.quantity}</strong></div>
+<label for="amountInput" id="amountLabel">Amount to add</label>
+<input type="number" id="amountInput" min="0" placeholder="0">
 
-      <label for="reasonSelect">Reason (required)</label>
-      <select id="reasonSelect">
-        <option value="">Select a reason...</option>
-        <option value="Restock">Restock</option>
-        <option value="Damaged item">Damaged item</option>
-        <option value="Personal use">Personal use</option>
-        <option value="Correction">Correction</option>
-        <option value="Physical count adjustment">Physical count adjustment</option>
-        <option value="Other">Other</option>
-      </select>
-      <input type="text" id="reasonOtherInput" placeholder="Describe the reason" class="hidden">
+<div class="preview" id="preview">
+  New quantity will be <strong>${p.quantity}</strong>
+</div>
 
-      <button id="applyBtn">Apply</button>
-      <div class="error" id="applyError"></div>
-      <div class="success" id="applySuccess"></div>
+<label for="reasonSelect">Reason <span style="color: var(--danger);">*</span></label>
+<select id="reasonSelect">
+  <option value="">Select a reason...</option>
+  <option value="Restock">Restock</option>
+  <option value="Damaged item">Damaged item</option>
+  <option value="Personal use">Personal use</option>
+  <option value="Correction">Correction</option>
+  <option value="Physical count adjustment">Physical count adjustment</option>
+  <option value="Other">Other</option>
+</select>
+
+<input
+  type="text"
+  id="reasonOtherInput"
+  class="hidden"
+  maxlength="160"
+  placeholder="Describe the reason"
+>
+
+<button id="applyBtn">Apply</button>
+<div class="error" id="applyError"></div>
+<div class="success" id="applySuccess"></div>
     </div>
   `;
 
@@ -345,8 +356,19 @@ function renderFoundProduct() {
     });
   });
 
-  document.getElementById('amountInput').addEventListener('input', updatePreview);
-  document.getElementById('applyBtn').addEventListener('click', applyAdjustment);
+ document.getElementById('amountInput').addEventListener('input', updatePreview);
+document.getElementById('applyBtn').addEventListener('click', applyAdjustment);
+
+document.getElementById('reasonSelect').addEventListener('change', (event) => {
+  const otherInput = document.getElementById('reasonOtherInput');
+  const isOther = event.target.value === 'Other';
+
+  otherInput.classList.toggle('hidden', !isOther);
+
+  if (!isOther) {
+    otherInput.value = '';
+  }
+});
   document.getElementById('reasonSelect').addEventListener('change', (e) => {
     document.getElementById('reasonOtherInput').classList.toggle('hidden', e.target.value !== 'Other');
   });
@@ -415,24 +437,30 @@ async function applyAdjustment() {
   const amt = document.getElementById('amountInput').value;
   const applyError = document.getElementById('applyError');
   const applySuccess = document.getElementById('applySuccess');
+
   applyError.textContent = '';
   applySuccess.textContent = '';
 
   const adminName = document.getElementById('adminNameInput').value.trim();
   const reasonSelected = document.getElementById('reasonSelect').value;
   const reasonOther = document.getElementById('reasonOtherInput').value.trim();
-  const reason = reasonSelected === 'Other' ? reasonOther : reasonSelected;
+
+  const reason = reasonSelected === 'Other'
+    ? reasonOther
+    : reasonSelected;
 
   if (amt === '' || Number(amt) < 0) {
     applyError.textContent = 'Enter a valid amount.';
     return;
   }
+
   if (!adminName) {
     applyError.textContent = 'Enter your name at the top of the page first.';
     return;
   }
+
   if (!reason) {
-    applyError.textContent = 'Select a reason (or describe one if you chose Other).';
+    applyError.textContent = 'Select a reason or describe one if you chose Other.';
     return;
   }
 
@@ -455,10 +483,12 @@ async function applyAdjustment() {
   currentProduct.quantity = result.quantity;
   document.getElementById('currentQtyDisplay').textContent = result.quantity;
   document.getElementById('amountInput').value = '';
+  document.getElementById('reasonSelect').value = '';
+  document.getElementById('reasonOtherInput').value = '';
+  document.getElementById('reasonOtherInput').classList.add('hidden');
+
   updatePreview();
 
-  // Rapid-fire workflow: clear SKU and refocus after a short pause so the
-  // success message is visible before moving to the next scan.
   setTimeout(() => {
     document.getElementById('skuInput').value = '';
     document.getElementById('resultArea').innerHTML = '';
