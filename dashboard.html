@@ -364,6 +364,12 @@
     </div>
 
     <div class="section">
+      <div class="section-head"><h2 style="font-size:1.05rem;">Internal inventory — low stock</h2></div>
+      <div id="internalLowStockList"></div>
+      <a class="nav-link" href="./internal-inventory.html" style="display:inline-block; margin-top:8px; color:var(--accent); font-size:0.82rem;">Open Internal Inventory →</a>
+    </div>
+
+    <div class="section">
       <div class="section-head"><h2 style="font-size:1.05rem;">Recent orders</h2></div>
       <div style="overflow-x:auto;">
         <table>
@@ -537,6 +543,29 @@ function renderDashboard(data) {
         </div>
       </div>
     `).join('');
+  }
+
+  const internalLowStockList = document.getElementById('internalLowStockList');
+  const internalLow = data.internalLowStock || [];
+  if (!internalLow.length) {
+    internalLowStockList.innerHTML = '<div class="empty">Nothing low right now.</div>';
+  } else {
+    internalLowStockList.innerHTML = internalLow.map(item => `
+      <div class="low-stock-item">
+        <div class="low-stock-info">
+          <span>${item.name}${item.category ? ' — ' + item.category : ''}</span>
+          <span class="qty">${item.quantity} on hand (threshold ${item.threshold})</span>
+        </div>
+        ${item.quickOrderUrl ? `<button class="quick-order-btn" data-url="${item.quickOrderUrl}">Quick Order</button>` : ''}
+      </div>
+    `).join('');
+    internalLowStockList.querySelectorAll('.quick-order-btn[data-url]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Same as internal-inventory.html — opens the saved URL only, no
+        // Sheet write, no API call. Pure link-open action.
+        window.open(btn.dataset.url, '_blank', 'noopener,noreferrer');
+      });
+    });
   }
 
   const tbody = document.getElementById('ordersTableBody');
