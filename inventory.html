@@ -256,9 +256,6 @@ async function doLookup() {
 
   if (result.found) {
     currentProduct = result.product;
-    const rbResult = await apiPost({ action: 'getReserveBackStock', sku: sku, password: dashboardPassword });
-    currentProduct.reserveStock = rbResult.error ? 0 : rbResult.reserveStock;
-    currentProduct.backStock = rbResult.error ? 0 : rbResult.backStock;
     renderFoundProduct();
   } else {
     renderNotFound(sku);
@@ -286,23 +283,6 @@ function renderFoundProduct() {
         <button id="toggleActiveBtn" class="${p.active ? 'is-active' : 'is-inactive'}">${p.active ? 'Deactivate' : 'Activate'}</button>
       </div>
       <div class="error" id="toggleActiveError"></div>
-
-      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);">
-        <label style="color:var(--text-dim); font-size:0.8rem; margin-bottom:8px; display:block;">Internal tracking — customers never see this</label>
-        <div style="display:flex; gap:10px;">
-          <div style="flex:1;">
-            <label for="reserveStockInput">Reserve Stock</label>
-            <input type="number" id="reserveStockInput" min="0" value="${p.reserveStock || 0}">
-          </div>
-          <div style="flex:1;">
-            <label for="backStockInput">Back Stock</label>
-            <input type="number" id="backStockInput" min="0" value="${p.backStock || 0}">
-          </div>
-        </div>
-        <button class="secondary" id="saveReserveBackBtn" style="margin-top:8px;">Save</button>
-        <div class="error" id="reserveBackError"></div>
-        <div class="success" id="reserveBackSuccess"></div>
-      </div>
 
       <div class="mode-tabs" style="margin-top:16px;">
         <button class="mode-tab active" data-mode="add">Add</button>
@@ -343,7 +323,6 @@ function renderFoundProduct() {
   `;
 
   document.getElementById('toggleActiveBtn').addEventListener('click', toggleActiveStatus);
-  document.getElementById('saveReserveBackBtn').addEventListener('click', saveReserveBackStock);
 
   document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -369,35 +348,6 @@ document.getElementById('reasonSelect').addEventListener('change', (event) => {
     otherInput.value = '';
   }
 });
-  document.getElementById('reasonSelect').addEventListener('change', (e) => {
-    document.getElementById('reasonOtherInput').classList.toggle('hidden', e.target.value !== 'Other');
-  });
-}
-
-async function saveReserveBackStock() {
-  const errorEl = document.getElementById('reserveBackError');
-  const successEl = document.getElementById('reserveBackSuccess');
-  errorEl.textContent = '';
-  successEl.textContent = '';
-
-  const reserveStock = document.getElementById('reserveStockInput').value;
-  const backStock = document.getElementById('backStockInput').value;
-
-  const result = await apiPost({
-    action: 'updateReserveBackStock',
-    sku: currentProduct.sku,
-    reserveStock: reserveStock,
-    backStock: backStock,
-    password: dashboardPassword
-  });
-
-  if (result.error) {
-    errorEl.textContent = result.error;
-    return;
-  }
-  currentProduct.reserveStock = result.reserveStock;
-  currentProduct.backStock = result.backStock;
-  successEl.textContent = 'Saved.';
 }
 
 async function toggleActiveStatus() {

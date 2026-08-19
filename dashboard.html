@@ -364,11 +364,6 @@
     </div>
 
     <div class="section">
-      <div class="section-head"><h2 style="font-size:1.05rem;">Reorder list</h2></div>
-      <div id="reorderList"></div>
-    </div>
-
-    <div class="section">
       <div class="section-head"><h2 style="font-size:1.05rem;">Recent orders</h2></div>
       <div style="overflow-x:auto;">
         <table>
@@ -540,15 +535,9 @@ function renderDashboard(data) {
           <span>${p.name}${p.flavor ? ' — ' + p.flavor : ''}</span>
           <span class="qty">${p.quantity} left (threshold ${p.threshold})</span>
         </div>
-        <button class="quick-order-btn" data-sku="${p.sku}">Quick Order</button>
       </div>
     `).join('');
-    lowStockList.querySelectorAll('.quick-order-btn').forEach(btn => {
-      btn.addEventListener('click', () => quickOrder(btn.dataset.sku, btn));
-    });
   }
-
-  renderReorderList(data.reorderList || []);
 
   const tbody = document.getElementById('ordersTableBody');
   if (!data.recentOrders.length) {
@@ -568,70 +557,6 @@ function renderDashboard(data) {
       </tr>
     `).join('');
   }
-}
-
-async function quickOrder(sku, btn) {
-  btn.disabled = true;
-  const result = await apiPost({ action: 'quickOrderLowStock', sku: sku, password: dashboardPassword });
-  if (result.error) {
-    alert(result.error);
-    btn.disabled = false;
-    return;
-  }
-  btn.textContent = result.alreadyExists ? 'Already listed' : 'Added ✓';
-  refresh();
-}
-
-function renderReorderList(list) {
-  const container = document.getElementById('reorderList');
-  if (!list.length) {
-    container.innerHTML = '<div class="empty">Nothing on the reorder list right now.</div>';
-    return;
-  }
-  container.innerHTML = list.map(item => `
-    <div class="reorder-item">
-      <div class="reorder-item-top">
-        <span class="reorder-item-name">${item.name}${item.flavor ? ' — ' + item.flavor : ''}</span>
-        <span>Suggested: ${item.suggestedQty}</span>
-      </div>
-      <div class="reorder-item-meta">Flagged ${item.timestampAdded} · was ${item.qtyWhenFlagged} left (threshold ${item.threshold})</div>
-      <select class="reorder-status-select" data-sku="${item.sku}" data-added="${item.timestampAdded}">
-        <option value="Needed" ${item.status === 'Needed' ? 'selected' : ''}>Needed</option>
-        <option value="Ordered" ${item.status === 'Ordered' ? 'selected' : ''}>Ordered</option>
-        <option value="Received" ${item.status === 'Received' ? 'selected' : ''}>Received</option>
-      </select>
-      <input type="text" class="reorder-note-input" placeholder="Note (optional)" value="${item.note ? item.note.replace(/"/g, '&quot;') : ''}" data-sku="${item.sku}" data-added="${item.timestampAdded}">
-      <div class="reorder-controls">
-        <button data-sku="${item.sku}" data-added="${item.timestampAdded}">Save</button>
-      </div>
-    </div>
-  `).join('');
-
-  container.querySelectorAll('.reorder-controls button').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const sku = btn.dataset.sku;
-      const added = btn.dataset.added;
-      const status = container.querySelector(`.reorder-status-select[data-sku="${sku}"][data-added="${added}"]`).value;
-      const note = container.querySelector(`.reorder-note-input[data-sku="${sku}"][data-added="${added}"]`).value;
-
-      btn.disabled = true;
-      const result = await apiPost({
-        action: 'markReorderStatus',
-        sku: sku,
-        timestampAdded: added,
-        newStatus: status,
-        note: note,
-        password: dashboardPassword
-      });
-      btn.disabled = false;
-
-      if (result.error) {
-        alert(result.error);
-        return;
-      }
-      refresh();
-    });
-  });
 }
 
 async function handleOrderAction(orderId, action, btn) {
