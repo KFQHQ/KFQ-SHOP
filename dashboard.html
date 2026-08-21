@@ -317,7 +317,10 @@
   <div id="dashboardContent" hidden>
     <div class="section-head">
       <h1>Dashboard</h1>
-      <button class="refresh-btn" id="refreshBtn">Refresh</button>
+      <div style="display:flex; gap:8px;">
+        <button class="refresh-btn" id="createOrderBtn" style="background:var(--surface-raised); color:var(--accent); border:1px solid var(--accent);">+ Create Order</button>
+        <button class="refresh-btn" id="refreshBtn">Refresh</button>
+      </div>
     </div>
 
     <div class="stats-row">
@@ -418,6 +421,68 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="createOrderModal" hidden>
+  <div class="modal-panel">
+    <h2>Create order</h2>
+    <p class="modal-sub">For walk-ins, text orders, or phone orders. Created as Confirmed immediately — inventory decrements right away.</p>
+
+    <div class="modal-field">
+      <label for="createBuyerName">Buyer name</label>
+      <input type="text" id="createBuyerName" placeholder="e.g. Walk-in customer">
+    </div>
+    <div class="modal-field">
+      <label for="createPhone">Phone (optional — required for loyalty tracking &amp; My Orders lookup)</label>
+      <input type="tel" id="createPhone" placeholder="631-555-0199">
+    </div>
+    <div class="modal-field">
+      <label for="createPin">PIN (optional)</label>
+      <input type="tel" id="createPin" placeholder="1234" maxlength="4">
+    </div>
+
+    <div id="createItemsList"></div>
+
+    <div class="add-item-row">
+      <select id="createAddItemSelect"><option value="">Add an item...</option></select>
+      <input type="number" id="createAddItemQty" min="1" value="1">
+      <button id="createAddItemBtn">Add</button>
+    </div>
+
+    <div class="modal-field">
+      <label for="createDiscountCode">Discount code (optional)</label>
+      <input type="text" id="createDiscountCode" placeholder="e.g. FIVEOFF">
+    </div>
+
+    <div class="modal-field">
+      <label for="createPaymentMethod">Payment method</label>
+      <select id="createPaymentMethod">
+        <option value="Cash">Cash</option>
+        <option value="PayPal">PayPal</option>
+        <option value="Venmo">Venmo</option>
+        <option value="Cash App">Cash App</option>
+        <option value="Zelle">Zelle</option>
+      </select>
+    </div>
+
+    <div class="modal-field">
+      <label for="createTotalInput">Total ($)</label>
+      <input type="number" id="createTotalInput" min="0" step="0.01">
+    </div>
+
+    <div class="modal-field">
+      <label for="createNotesInput">Notes</label>
+      <input type="text" id="createNotesInput" placeholder="e.g. Walk-in" value="Walk-in">
+    </div>
+
+    <div class="error" id="createOrderError"></div>
+    <div class="success" id="createOrderSuccess"></div>
+
+    <div class="modal-btn-row">
+      <button class="save-btn" id="submitCreateOrderBtn">Create order</button>
+      <button class="close-modal-btn" id="closeCreateOrderBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xscd7fTE5PpPWYGz8gdiTd-dTVwatXdXGzGJIKurl_ljUyyjI-IAQg/exec";
 
@@ -426,6 +491,8 @@ let allProductsCache = [];
 let editItems = []; // [{sku, name, flavor, price, quantity}]
 let editOrderId = '';
 let totalManuallyEdited = false;
+let createItems = []; // [{sku, name, flavor, price, quantity}]
+let createTotalManuallyEdited = false;
 
 function money(n) { return '$' + Number(n || 0).toFixed(2); }
 
@@ -619,11 +686,12 @@ document.getElementById('refreshBtn').addEventListener('click', refresh);
    Edit order modal
    ------------------------------------------------------------------------ */
 function populateAddItemSelect() {
-  const select = document.getElementById('addItemSelect');
-  select.innerHTML = '<option value="">Add an item...</option>' +
+  const optionsHtml = '<option value="">Add an item...</option>' +
     allProductsCache.map(p =>
       `<option value="${p.sku}">${escapeHtml(p.name)}${p.flavor ? ' - ' + escapeHtml(p.flavor) : ''} ($${Number(p.price).toFixed(2)})</option>`
     ).join('');
+  document.getElementById('addItemSelect').innerHTML = optionsHtml;
+  document.getElementById('createAddItemSelect').innerHTML = optionsHtml;
 }
 
 function openEditModal(orderId, pendingOrders) {
@@ -766,6 +834,151 @@ document.getElementById('saveEditBtn').addEventListener('click', async () => {
 
   document.getElementById('editModal').hidden = true;
   refresh();
+});
+
+/* ------------------------------------------------------------------------
+   Create order (manual entry — walk-ins, text orders, phone orders)
+   ------------------------------------------------------------------------ */
+document.getElementById('createOrderBtn').addEventListener('click', () => {
+  createItems = [];
+  createTotalManuallyEdited = false;
+  document.getElementById('createBuyerName').value = '';
+  document.getElementById('createPhone').value = '';
+  document.getElementById('createPin').value = '';
+  document.getElementById('createDiscountCode').value = '';
+  document.getElementById('createPaymentMethod').value = 'Cash';
+  document.getElementById('createNotesInput').value = 'Walk-in';
+  document.getElementById('createTotalInput').value = '';
+  document.getElementById('createOrderError').textContent = '';
+  document.getElementById('createOrderSuccess').textContent = '';
+  renderCreateItems();
+  document.getElementById('createOrderModal').hidden = false;
+});
+
+document.getElementById('closeCreateOrderBtn').addEventListener('click', () => {
+  document.getElementById('createOrderModal').hidden = true;
+});
+
+function renderCreateItems() {
+  const list = document.getElementById('createItemsList');
+  if (!createItems.length) {
+    list.innerHTML = '<p class="modal-sub">No items yet — add at least one below.</p>';
+  } else {
+    list.innerHTML = createItems.map((item, i) => `
+      <div class="edit-item-row">
+        <span class="item-name">${escapeHtml(item.name)}${item.flavor ? ' - ' + escapeHtml(item.flavor) : ''} ($${Number(item.price).toFixed(2)})</span>
+        <input type="number" min="1" value="${item.quantity}" data-index="${i}" class="create-qty-input">
+        <button class="remove-item-btn" data-index="${i}">&times;</button>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.create-qty-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const i = Number(input.dataset.index);
+        createItems[i].quantity = Math.max(1, Number(input.value) || 1);
+        recalcCreateSuggestedTotal();
+      });
+    });
+    list.querySelectorAll('.remove-item-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        createItems.splice(Number(btn.dataset.index), 1);
+        renderCreateItems();
+        recalcCreateSuggestedTotal();
+      });
+    });
+  }
+  recalcCreateSuggestedTotal();
+}
+
+function recalcCreateSuggestedTotal() {
+  if (createTotalManuallyEdited) return;
+  const suggested = createItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  document.getElementById('createTotalInput').value = suggested > 0 ? suggested.toFixed(2) : '';
+}
+
+document.getElementById('createTotalInput').addEventListener('input', () => {
+  createTotalManuallyEdited = true;
+});
+
+document.getElementById('createAddItemBtn').addEventListener('click', () => {
+  const select = document.getElementById('createAddItemSelect');
+  const sku = select.value;
+  if (!sku) return;
+  const qty = Math.max(1, Number(document.getElementById('createAddItemQty').value) || 1);
+
+  const existing = createItems.find(item => item.sku === sku);
+  if (existing) {
+    existing.quantity += qty;
+  } else {
+    const product = allProductsCache.find(p => p.sku === sku);
+    createItems.push({ sku: sku, name: product.name, flavor: product.flavor, price: product.price, quantity: qty });
+  }
+
+  select.value = '';
+  document.getElementById('createAddItemQty').value = '1';
+  renderCreateItems();
+});
+
+document.getElementById('submitCreateOrderBtn').addEventListener('click', async () => {
+  const errorEl = document.getElementById('createOrderError');
+  const successEl = document.getElementById('createOrderSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const buyerName = document.getElementById('createBuyerName').value.trim();
+  const phone = document.getElementById('createPhone').value.trim();
+  const pin = document.getElementById('createPin').value.trim();
+  const discountCode = document.getElementById('createDiscountCode').value.trim();
+  const paymentMethod = document.getElementById('createPaymentMethod').value;
+  const notes = document.getElementById('createNotesInput').value.trim();
+  const total = document.getElementById('createTotalInput').value;
+
+  if (!buyerName) {
+    errorEl.textContent = 'Buyer name is required.';
+    return;
+  }
+  if (!createItems.length) {
+    errorEl.textContent = 'An order must have at least one item.';
+    return;
+  }
+  if (total === '' || Number(total) < 0) {
+    errorEl.textContent = 'Enter a valid total.';
+    return;
+  }
+
+  const submitBtn = document.getElementById('submitCreateOrderBtn');
+  submitBtn.disabled = true;
+
+  const result = await apiPost({
+    action: 'createManualOrder',
+    fields: {
+      buyerName: buyerName,
+      phone: phone || undefined,
+      pin: pin || undefined,
+      items: createItems.map(item => ({ sku: item.sku, quantity: item.quantity })),
+      discountCode: discountCode || undefined,
+      paymentMethod: paymentMethod,
+      notes: notes,
+      total: Number(total)
+    },
+    password: dashboardPassword
+  });
+
+  submitBtn.disabled = false;
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  successEl.textContent = 'Order ' + result.orderId + ' created — ' + money(result.total);
+  createItems = [];
+  renderCreateItems();
+  refresh();
+
+  setTimeout(() => {
+    document.getElementById('createOrderModal').hidden = true;
+  }, 1200);
 });
 </script>
 </body>
