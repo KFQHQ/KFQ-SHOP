@@ -137,6 +137,22 @@ select {
   #scanner { margin: 14px 0; border-radius: 10px; overflow: hidden; }
   .hidden { display: none !important; }
 
+  .count-session-banner {
+    background: rgba(63,217,199,0.1);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .count-session-stats { display: flex; gap: 16px; font-size: 0.85rem; margin-bottom: 10px; flex-wrap: wrap; }
+  .count-session-stats strong { color: var(--accent); }
+  .count-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-top: 16px; }
+  .count-diff { font-size: 1.4rem; font-weight: 700; margin: 10px 0; }
+  .count-diff.zero { color: var(--text-dim); }
+  .count-diff.positive { color: var(--accent); }
+  .count-diff.negative { color: var(--danger); }
+  .summary-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-top: 16px; text-align: center; }
+
   .new-item-form .field { margin-bottom: 4px; }
   .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 0.9rem; }
   .checkbox-row input { width: auto; margin: 0; }
@@ -160,6 +176,16 @@ select {
     <label for="adminNameInput">Your name (required for the change log)</label>
     <input type="text" id="adminNameInput" placeholder="e.g. Yianni">
 
+    <div id="countSessionBanner" class="count-session-banner hidden">
+      <div class="count-session-stats">
+        <span><strong id="countSessionCounted">0</strong> counted</span>
+        <span><strong id="countSessionDiffs">0</strong> differences</span>
+        <span><strong id="countSessionNet">0</strong> net units</span>
+      </div>
+      <button class="secondary" id="endCountSessionBtn">End Session</button>
+    </div>
+    <button class="secondary" id="startCountSessionBtn" style="margin-bottom:14px;">Start Physical Count Session</button>
+
     <label for="skuInput">SKU</label>
     <input type="text" id="skuInput" placeholder="e.g. TERPBLAST-KFQ" autofocus>
     <div class="btn-row">
@@ -181,6 +207,7 @@ let dashboardPassword = '';
 let html5QrScanner = null;
 let currentProduct = null;
 let currentMode = 'add';
+let countSession = null; // { sessionId, counted, diffs, net }
 
 async function apiPost(body) {
   const res = await fetch(API_BASE_URL, {
@@ -256,7 +283,11 @@ async function doLookup() {
 
   if (result.found) {
     currentProduct = result.product;
-    renderFoundProduct();
+    if (countSession) {
+      renderCountCard();
+    } else {
+      renderFoundProduct();
+    }
   } else {
     renderNotFound(sku);
   }
@@ -571,6 +602,139 @@ function stopScanner() {
     html5QrScanner = null;
     document.getElementById('scanner').classList.add('hidden');
   });
+}
+
+/* ------------------------------------------------------------------------
+   Physical-count inventory session
+   ------------------------------------------------------------------------ */
+document.getElementById('startCountSessionBtn').addEventListener('click', async () => {
+  const adminName = document.getElementById('adminNameInput').value.trim();
+  const errorEl = document.getElementById('lookupError');
+  errorEl.textContent = '';
+
+  if (!adminName) {
+    errorEl.textContent = 'Enter your name before starting a count session.';
+    return;
+  }
+
+  const result = await apiPost({ action: 'startCountSession', admin: adminName, password: dashboardPassword });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  countSession = { sessionId: result.sessionId, counted: 0, diffs: 0, net: 0 };
+  updateCountSessionBanner();
+  document.getElementById('countSessionBanner').classList.remove('hidden');
+  document.getElementById('startCountSessionBtn').classList.add('hidden');
+  document.getElementById('resultArea').innerHTML = '';
+  document.getElementById('skuInput').value = '';
+  document.getElementById('skuInput').focus();
+});
+
+document.getElementById('endCountSessionBtn').addEventListener('click', async () => {
+  if (!countSession) return;
+  const result = await apiPost({ action: 'endCountSession', sessionId: countSession.sessionId, password: dashboardPassword });
+  if (result.error) {
+    document.getElementById('lookupError').textContent = result.error;
+    return;
+  }
+
+  document.getElementById('countSessionBanner').classList.add('hidden');
+  document.getElementById('startCountSessionBtn').classList.remove('hidden');
+  document.getElementById('resultArea').innerHTML = `
+    <div class="summary-panel">
+      <h2 style="font-size:1.1rem;">Count session complete</h2>
+      <p style="color:var(--text-dim); font-size:0.85rem;">${result.sessionId}</p>
+      <div class="stat-row"><span class="label">Products counted</span><span>${result.productsCounted}</span></div>
+      <div class="stat-row"><span class="label">Differences found</span><span>${result.differencesFound}</span></div>
+      <div class="stat-row"><span class="label">Net units adjusted</span><span>${result.netUnitsAdjusted}</span></div>
+    </div>
+  `;
+  countSession = null;
+});
+
+function updateCountSessionBanner() {
+  if (!countSession) return;
+  document.getElementById('countSessionCounted').textContent = countSession.counted;
+  document.getElementById('countSessionDiffs').textContent = countSession.diffs;
+  document.getElementById('countSessionNet').textContent = (countSession.net > 0 ? '+' : '') + countSession.net;
+}
+
+function renderCountCard() {
+  const p = currentProduct;
+  document.getElementById('resultArea').innerHTML = `
+    <div class="count-card">
+      <div class="product-name">${escapeHtml(p.name)}</div>
+      <div class="product-flavor">${escapeHtml(p.flavor || '')}</div>
+      <div class="stat-row"><span class="label">Sheet quantity</span><span>${p.quantity}</span></div>
+
+      <label for="physicalCountInput">Physical count</label>
+      <input type="number" id="physicalCountInput" min="0" placeholder="Enter what you actually counted">
+      <div class="count-diff zero" id="countDiffPreview">Difference: 0</div>
+
+      <button id="recordCountBtn">Record Count</button>
+      <div class="error" id="countError"></div>
+      <div class="success" id="countSuccess"></div>
+    </div>
+  `;
+
+  const input = document.getElementById('physicalCountInput');
+  input.addEventListener('input', () => {
+    const physical = Number(input.value);
+    const diff = (input.value === '') ? 0 : physical - p.quantity;
+    const diffEl = document.getElementById('countDiffPreview');
+    diffEl.textContent = 'Difference: ' + (diff > 0 ? '+' : '') + diff;
+    diffEl.className = 'count-diff ' + (diff === 0 ? 'zero' : diff > 0 ? 'positive' : 'negative');
+  });
+  input.focus();
+
+  document.getElementById('recordCountBtn').addEventListener('click', submitCount);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submitCount(); });
+}
+
+async function submitCount() {
+  const physicalCount = document.getElementById('physicalCountInput').value;
+  const errorEl = document.getElementById('countError');
+  const successEl = document.getElementById('countSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  if (physicalCount === '' || Number(physicalCount) < 0) {
+    errorEl.textContent = 'Enter a valid count.';
+    return;
+  }
+
+  const adminName = document.getElementById('adminNameInput').value.trim();
+
+  const result = await apiPost({
+    action: 'recordCount',
+    sessionId: countSession.sessionId,
+    sku: currentProduct.sku,
+    physicalCount: physicalCount,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  countSession.counted++;
+  if (result.adjusted) countSession.diffs++;
+  countSession.net += result.difference;
+  updateCountSessionBanner();
+
+  successEl.textContent = result.adjusted
+    ? 'Recorded — adjusted by ' + (result.difference > 0 ? '+' : '') + result.difference
+    : 'Recorded — matched, no adjustment needed';
+
+  setTimeout(() => {
+    document.getElementById('skuInput').value = '';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('skuInput').focus();
+  }, 1100);
 }
 </script>
 </body>
