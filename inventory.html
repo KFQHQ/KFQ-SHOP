@@ -254,7 +254,28 @@ async function unlock() {
   const savedName = localStorage.getItem('kfq_inventory_admin_name');
   if (savedName) document.getElementById('adminNameInput').value = savedName;
 
+  restoreCountSessionFromStorage();
+
   document.getElementById('skuInput').focus();
+}
+
+function saveCountSessionToStorage() {
+  if (countSession) {
+    localStorage.setItem('kfq_active_count_session', JSON.stringify(countSession));
+  }
+}
+
+function restoreCountSessionFromStorage() {
+  const saved = localStorage.getItem('kfq_active_count_session');
+  if (!saved) return;
+  try {
+    countSession = JSON.parse(saved);
+    updateCountSessionBanner();
+    document.getElementById('countSessionBanner').classList.remove('hidden');
+    document.getElementById('startCountSessionBtn').classList.add('hidden');
+  } catch (e) {
+    localStorage.removeItem('kfq_active_count_session');
+  }
 }
 
 document.getElementById('adminNameInput').addEventListener('input', (e) => {
@@ -624,6 +645,7 @@ document.getElementById('startCountSessionBtn').addEventListener('click', async 
   }
 
   countSession = { sessionId: result.sessionId, counted: 0, diffs: 0, net: 0 };
+  saveCountSessionToStorage();
   updateCountSessionBanner();
   document.getElementById('countSessionBanner').classList.remove('hidden');
   document.getElementById('startCountSessionBtn').classList.add('hidden');
@@ -640,6 +662,7 @@ document.getElementById('endCountSessionBtn').addEventListener('click', async ()
     return;
   }
 
+  localStorage.removeItem('kfq_active_count_session');
   document.getElementById('countSessionBanner').classList.add('hidden');
   document.getElementById('startCountSessionBtn').classList.remove('hidden');
   document.getElementById('resultArea').innerHTML = `
@@ -710,6 +733,7 @@ async function submitCount() {
   const result = await apiPost({
     action: 'recordCount',
     sessionId: countSession.sessionId,
+    inventoryType: 'store',
     sku: currentProduct.sku,
     physicalCount: physicalCount,
     admin: adminName,
@@ -724,6 +748,7 @@ async function submitCount() {
   countSession.counted++;
   if (result.adjusted) countSession.diffs++;
   countSession.net += result.difference;
+  saveCountSessionToStorage();
   updateCountSessionBanner();
 
   successEl.textContent = result.adjusted
