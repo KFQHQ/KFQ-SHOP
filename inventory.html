@@ -208,6 +208,7 @@ let html5QrScanner = null;
 let currentProduct = null;
 let currentMode = 'add';
 let countSession = null; // { sessionId, counted, diffs, net }
+let currentCountItemType = 'store'; // which system the currently-displayed count item actually came from
 
 async function apiPost(body) {
   const res = await fetch(API_BASE_URL, {
@@ -304,14 +305,30 @@ async function doLookup() {
 
   if (result.found) {
     currentProduct = result.product;
+    currentCountItemType = 'store';
     if (countSession) {
       renderCountCard();
     } else {
       renderFoundProduct();
     }
-  } else {
-    renderNotFound(sku);
+    return;
   }
+
+  // Not a store SKU — during an active count session, this is one
+  // continuous session across both systems, so also check Internal
+  // Inventory before giving up. Outside a session, stay scoped to Products
+  // only, same as before.
+  if (countSession) {
+    const internalResult = await apiPost({ action: 'lookupInternalItem', sku: sku, password: dashboardPassword });
+    if (!internalResult.error && internalResult.found) {
+      currentProduct = internalResult.item;
+      currentCountItemType = 'backstock';
+      renderCountCard();
+      return;
+    }
+  }
+
+  renderNotFound(sku);
 }
 
 /* ---------------- Found: adjust quantity ---------------- */
@@ -686,10 +703,13 @@ function updateCountSessionBanner() {
 
 function renderCountCard() {
   const p = currentProduct;
+  const subLabel = currentCountItemType === 'backstock' ? (p.category || '') : (p.flavor || '');
+  const typeBadge = currentCountItemType === 'backstock' ? 'Backstock' : 'Store';
   document.getElementById('resultArea').innerHTML = `
     <div class="count-card">
+      <div class="stat-row" style="border-bottom:none; padding-bottom:0;"><span class="label"></span><span style="color:var(--accent); font-size:0.75rem; font-weight:700; text-transform:uppercase;">${typeBadge}</span></div>
       <div class="product-name">${escapeHtml(p.name)}</div>
-      <div class="product-flavor">${escapeHtml(p.flavor || '')}</div>
+      <div class="product-flavor">${escapeHtml(subLabel)}</div>
       <div class="stat-row"><span class="label">Sheet quantity</span><span>${p.quantity}</span></div>
 
       <label for="physicalCountInput">Physical count</label>
@@ -733,7 +753,7 @@ async function submitCount() {
   const result = await apiPost({
     action: 'recordCount',
     sessionId: countSession.sessionId,
-    inventoryType: 'store',
+    inventoryType: currentCountItemType,
     sku: currentProduct.sku,
     physicalCount: physicalCount,
     admin: adminName,

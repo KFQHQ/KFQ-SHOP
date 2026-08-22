@@ -195,6 +195,7 @@ let html5QrScanner = null;
 let currentItem = null;
 let currentMode = 'add';
 let countSession = null; // { sessionId, counted, diffs, net } — shared with inventory.html via localStorage
+let currentCountItemType = 'backstock'; // which system the currently-displayed count item actually came from
 
 async function apiPost(body) {
   const res = await fetch(API_BASE_URL, {
@@ -280,14 +281,29 @@ async function doLookup() {
 
   if (result.found) {
     currentItem = result.item;
+    currentCountItemType = 'backstock';
     if (countSession) {
       renderCountCard();
     } else {
       renderFoundItem();
     }
-  } else {
-    renderNotFound(sku);
+    return;
   }
+
+  // Not a backstock SKU — during an active count session, this is one
+  // continuous session across both systems, so also check Products before
+  // giving up. Outside a session, stay scoped to Internal Inventory only.
+  if (countSession) {
+    const productResult = await apiPost({ action: 'lookupProductForInventory', sku: sku, password: dashboardPassword });
+    if (!productResult.error && productResult.found) {
+      currentItem = productResult.product;
+      currentCountItemType = 'store';
+      renderCountCard();
+      return;
+    }
+  }
+
+  renderNotFound(sku);
 }
 
 /* ---------------- Found: full item card ---------------- */
@@ -746,10 +762,13 @@ function updateCountSessionBanner() {
 
 function renderCountCard() {
   const p = currentItem;
+  const subLabel = currentCountItemType === 'store' ? (p.flavor || '') : (p.category || '');
+  const typeBadge = currentCountItemType === 'store' ? 'Store' : 'Backstock';
   document.getElementById('resultArea').innerHTML = `
     <div class="count-card">
+      <div class="stat-row" style="border-bottom:none; padding-bottom:0;"><span class="label"></span><span style="color:var(--accent); font-size:0.75rem; font-weight:700; text-transform:uppercase;">${typeBadge}</span></div>
       <div class="item-name">${escapeHtml(p.name)}</div>
-      <div class="item-category">${escapeHtml(p.category || '')}</div>
+      <div class="item-category">${escapeHtml(subLabel)}</div>
       <div class="stat-row"><span class="label">Sheet quantity</span><span>${p.quantity}</span></div>
 
       <label for="physicalCountInput">Physical count</label>
@@ -793,7 +812,7 @@ async function submitCount() {
   const result = await apiPost({
     action: 'recordCount',
     sessionId: countSession.sessionId,
-    inventoryType: 'backstock',
+    inventoryType: currentCountItemType,
     sku: currentItem.sku,
     physicalCount: physicalCount,
     admin: adminName,
