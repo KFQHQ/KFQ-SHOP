@@ -509,6 +509,19 @@ function formatItemsList(itemsStr, quantitiesStr) {
   return items.map((item, i) => escapeHtml(item) + ' ×' + (quantities[i] || '?')).join('<br><br>');
 }
 
+// Same, but includes each item's batch tag (blank for pre-batch-tracking orders).
+function formatItemsListWithBatch(itemsStr, quantitiesStr, batchIdsStr) {
+  const items = String(itemsStr || '').split(', ').filter(Boolean);
+  const quantities = String(quantitiesStr || '').split(',').map(q => q.trim()).filter(Boolean);
+  const batchIds = String(batchIdsStr || '').split(',').map(b => b.trim());
+  if (!items.length) return '';
+  return items.map((item, i) => {
+    const batch = batchIds[i];
+    const batchLine = batch ? '<br><span style="color:var(--text-dim); font-size:0.75rem;">Batch: ' + escapeHtml(batch) + '</span>' : '';
+    return escapeHtml(item) + ' ×' + (quantities[i] || '?') + batchLine;
+  }).join('<br><br>');
+}
+
 function escapeHtml(value) {
   const div = document.createElement('div');
   div.textContent = String(value || '');
@@ -645,7 +658,7 @@ function renderDashboard(data) {
         <td>${o.date}</td>
         <td>${o.buyerName}</td>
         <td>${o.phone}</td>
-        <td>${formatItemsList(o.items, o.quantities)}</td>
+        <td>${formatItemsListWithBatch(o.items, o.quantities, o.batchIds)}</td>
         <td>${money(o.total)}</td>
         <td>${o.paymentMethod || 'Pending'}</td>
         <td>${statusBadge(o.status)}</td>

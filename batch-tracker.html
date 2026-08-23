@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KFQ Shop — Batch Tracker</title>
+<style>
+  :root {
+    --bg: #101214;
+    --surface: #1B1E22;
+    --surface-raised: #24282D;
+    --border: #303539;
+    --text: #EDEAE3;
+    --text-dim: #9A9C9E;
+    --accent: #3FD9C7;
+    --warm: #E8963C;
+    --danger: #E1553F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  .wrap { max-width: 600px; margin: 0 auto; }
+  h1, h2 { margin: 0 0 4px; }
+
+  .gate {
+    max-width: 360px;
+    margin: 100px auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    text-align: center;
+  }
+  input, select, textarea {
+    width: 100%;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 0.95rem;
+    margin: 8px 0;
+    font-family: inherit;
+  }
+  label { display: block; font-size: 0.8rem; color: var(--text-dim); margin: 10px 0 4px; }
+  button {
+    background: var(--accent);
+    color: #0A2320;
+    font-weight: 700;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+  button.secondary { background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+  .btn-row button { flex: 1; }
+
+  .error { color: #F3A99A; font-size: 0.85rem; margin-top: 8px; }
+  .success { color: var(--accent); font-size: 0.85rem; margin-top: 8px; }
+  .hidden { display: none !important; }
+
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-top: 20px; }
+
+  .material-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+  .material-row .material-name { flex: 1; font-size: 0.85rem; }
+  .material-row button {
+    width: auto;
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 1.1rem;
+    padding: 0 4px;
+  }
+  .add-material-row { display: flex; gap: 8px; margin: 10px 0; }
+  .add-material-row select { flex: 1; margin: 0; }
+  .add-material-row input { width: 70px; margin: 0; }
+  .add-material-row button { width: auto; padding: 0 14px; background: var(--surface-raised); color: var(--accent); border: 1px solid var(--accent); }
+
+  .batch-card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+  .batch-card-top { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.9rem; }
+  .batch-card-meta { font-size: 0.78rem; color: var(--text-dim); margin-top: 4px; }
+  .batch-detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 0.82rem; }
+  .batch-detail .row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .batch-detail .row .label { color: var(--text-dim); }
+
+  .empty { color: var(--text-dim); font-size: 0.85rem; padding: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="gate" id="gate">
+    <h2>Batch Tracker</h2>
+    <p style="color:var(--text-dim); font-size:0.85rem;">Owner access only.</p>
+    <input type="password" id="passwordInput" placeholder="Password">
+    <button id="unlockBtn">Unlock</button>
+    <div class="error" id="gateError"></div>
+  </div>
+
+  <div id="toolContent" class="hidden">
+    <h1>Batch Tracker</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem;">Full production traceability — from back-stock materials through to sales.</p>
+
+    <label for="adminNameInput">Your name</label>
+    <input type="text" id="adminNameInput" placeholder="e.g. Yianni">
+
+    <div class="section">
+      <h2 style="font-size:1.05rem;">New Batch</h2>
+
+      <label for="strainNameInput">Strain Name</label>
+      <input type="text" id="strainNameInput" placeholder="e.g. Blue Razz">
+
+      <label for="productSkuSelect">Product this batch produces</label>
+      <select id="productSkuSelect"><option value="">Select a product...</option></select>
+
+      <label for="formulaInput">Formula Used</label>
+      <textarea id="formulaInput" rows="2" placeholder="e.g. 60/40 VG/PG, 3% nic, 2ml terpenes per 100ml"></textarea>
+
+      <label for="heatPlateInput">Heat-Plate Time</label>
+      <input type="text" id="heatPlateInput" placeholder="e.g. 45 min at 220°F">
+
+      <label for="totalYieldedInput">Total Amount Yielded (units)</label>
+      <input type="number" id="totalYieldedInput" min="1">
+
+      <label style="margin-top:14px;">Materials used (from back-stock)</label>
+      <div id="materialsList"></div>
+      <div class="add-material-row">
+        <select id="addMaterialSelect"><option value="">Add a material...</option></select>
+        <input type="number" id="addMaterialQty" min="1" value="1">
+        <button id="addMaterialBtn">Add</button>
+      </div>
+
+      <label for="batchNotesInput">Notes (optional)</label>
+      <input type="text" id="batchNotesInput">
+
+      <button id="createBatchBtn" style="margin-top:12px;">Create Batch</button>
+      <div class="error" id="createBatchError"></div>
+      <div class="success" id="createBatchSuccess"></div>
+    </div>
+
+    <div class="section">
+      <h2 style="font-size:1.05rem;">Recent Batches</h2>
+      <div id="batchList"></div>
+      <button class="secondary" id="refreshBatchesBtn" style="margin-top:10px;">Refresh</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xscd7fTE5PpPWYGz8gdiTd-dTVwatXdXGzGJIKurl_ljUyyjI-IAQg/exec";
+
+let dashboardPassword = '';
+let allProductsCache = [];
+let allInternalItemsCache = [];
+let batchMaterials = []; // [{sku, name, quantity}]
+let batchListCache = [];
+
+async function apiPost(body) {
+  const res = await fetch(API_BASE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+function escapeHtml(value) {
+  const div = document.createElement('div');
+  div.textContent = String(value || '');
+  return div.innerHTML;
+}
+
+/* ---------------- Password gate ---------------- */
+async function unlock() {
+  const pw = document.getElementById('passwordInput').value;
+  const errorEl = document.getElementById('gateError');
+  errorEl.textContent = '';
+
+  const result = await apiPost({ action: 'getDashboardData', password: pw });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  dashboardPassword = pw;
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('toolContent').classList.remove('hidden');
+
+  const savedName = localStorage.getItem('kfq_inventory_admin_name');
+  if (savedName) document.getElementById('adminNameInput').value = savedName;
+
+  await loadProductOptions();
+  await loadMaterialOptions();
+  await loadBatchList();
+}
+
+document.getElementById('adminNameInput').addEventListener('input', (e) => {
+  localStorage.setItem('kfq_inventory_admin_name', e.target.value);
+});
+document.getElementById('unlockBtn').addEventListener('click', unlock);
+document.getElementById('passwordInput').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+
+/* ---------------- Load pickers ---------------- */
+async function loadProductOptions() {
+  const products = await apiPost({ action: 'getAllProductsForOwner', password: dashboardPassword });
+  if (products.error) return;
+  allProductsCache = products;
+  document.getElementById('productSkuSelect').innerHTML = '<option value="">Select a product...</option>' +
+    products.map(p => `<option value="${p.sku}">${escapeHtml(p.name)}${p.flavor ? ' - ' + escapeHtml(p.flavor) : ''}</option>`).join('');
+}
+
+async function loadMaterialOptions() {
+  const items = await apiPost({ action: 'getInternalInventoryList', password: dashboardPassword });
+  if (items.error) return;
+  allInternalItemsCache = items;
+  document.getElementById('addMaterialSelect').innerHTML = '<option value="">Add a material...</option>' +
+    items.map(i => `<option value="${i.sku}">${escapeHtml(i.name)} (${i.quantity} on hand)</option>`).join('');
+}
+
+/* ---------------- Materials picker ---------------- */
+document.getElementById('addMaterialBtn').addEventListener('click', () => {
+  const select = document.getElementById('addMaterialSelect');
+  const sku = select.value;
+  if (!sku) return;
+  const qty = Math.max(1, Number(document.getElementById('addMaterialQty').value) || 1);
+
+  const existing = batchMaterials.find(m => m.sku === sku);
+  if (existing) {
+    existing.quantity += qty;
+  } else {
+    const item = allInternalItemsCache.find(i => i.sku === sku);
+    batchMaterials.push({ sku: sku, name: item.name, quantity: qty });
+  }
+
+  select.value = '';
+  document.getElementById('addMaterialQty').value = '1';
+  renderMaterials();
+});
+
+function renderMaterials() {
+  const list = document.getElementById('materialsList');
+  if (!batchMaterials.length) {
+    list.innerHTML = '<p class="empty">No materials added yet.</p>';
+    return;
+  }
+  list.innerHTML = batchMaterials.map((m, i) => `
+    <div class="material-row">
+      <span class="material-name">${escapeHtml(m.name)} — qty ${m.quantity}</span>
+      <button data-index="${i}">&times;</button>
+    </div>
+  `).join('');
+  list.querySelectorAll('button[data-index]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      batchMaterials.splice(Number(btn.dataset.index), 1);
+      renderMaterials();
+    });
+  });
+}
+renderMaterials();
+
+/* ---------------- Create batch ---------------- */
+document.getElementById('createBatchBtn').addEventListener('click', async () => {
+  const errorEl = document.getElementById('createBatchError');
+  const successEl = document.getElementById('createBatchSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const adminName = document.getElementById('adminNameInput').value.trim();
+  const strainName = document.getElementById('strainNameInput').value.trim();
+  const productSku = document.getElementById('productSkuSelect').value;
+  const formulaUsed = document.getElementById('formulaInput').value.trim();
+  const heatPlateTime = document.getElementById('heatPlateInput').value.trim();
+  const totalYielded = document.getElementById('totalYieldedInput').value;
+  const notes = document.getElementById('batchNotesInput').value.trim();
+
+  if (!adminName) { errorEl.textContent = 'Your name is required.'; return; }
+  if (!strainName) { errorEl.textContent = 'Strain name is required.'; return; }
+  if (!productSku) { errorEl.textContent = 'Select which product this batch produces.'; return; }
+  if (!totalYielded || Number(totalYielded) <= 0) { errorEl.textContent = 'Enter a valid total amount yielded.'; return; }
+
+  const btn = document.getElementById('createBatchBtn');
+  btn.disabled = true;
+
+  const result = await apiPost({
+    action: 'createBatch',
+    fields: {
+      strainName: strainName,
+      productSku: productSku,
+      formulaUsed: formulaUsed,
+      heatPlateTime: heatPlateTime,
+      totalYielded: totalYielded,
+      materials: batchMaterials.map(m => ({ sku: m.sku, quantity: m.quantity })),
+      notes: notes
+    },
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  btn.disabled = false;
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  successEl.textContent = 'Batch created: ' + result.batchId;
+  document.getElementById('strainNameInput').value = '';
+  document.getElementById('productSkuSelect').value = '';
+  document.getElementById('formulaInput').value = '';
+  document.getElementById('heatPlateInput').value = '';
+  document.getElementById('totalYieldedInput').value = '';
+  document.getElementById('batchNotesInput').value = '';
+  batchMaterials = [];
+  renderMaterials();
+  await loadMaterialOptions(); // back-stock quantities changed
+  await loadBatchList();
+});
+
+/* ---------------- Batch list ---------------- */
+document.getElementById('refreshBatchesBtn').addEventListener('click', loadBatchList);
+
+async function loadBatchList() {
+  const result = await apiPost({ action: 'getBatchList', password: dashboardPassword });
+  const container = document.getElementById('batchList');
+  if (result.error) {
+    container.innerHTML = '<div class="empty">Could not load batches.</div>';
+    return;
+  }
+  batchListCache = result;
+  if (!result.length) {
+    container.innerHTML = '<div class="empty">No batches yet.</div>';
+    return;
+  }
+  container.innerHTML = result.map((b, i) => `
+    <div class="batch-card" data-index="${i}">
+      <div class="batch-card-top"><span>${escapeHtml(b.strainName)}</span><span>${b.totalYielded} units</span></div>
+      <div class="batch-card-meta">${b.batchId} · ${b.creationDate} · ${escapeHtml(b.productSku)}</div>
+      <div class="batch-detail hidden" id="batchDetail-${i}"></div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.batch-card').forEach(card => {
+    card.addEventListener('click', () => toggleBatchDetail(Number(card.dataset.index)));
+  });
+}
+
+async function toggleBatchDetail(index) {
+  const detailEl = document.getElementById('batchDetail-' + index);
+  if (!detailEl.classList.contains('hidden')) {
+    detailEl.classList.add('hidden');
+    return;
+  }
+
+  const batch = batchListCache[index];
+  const result = await apiPost({ action: 'getBatchDetail', batchId: batch.batchId, password: dashboardPassword });
+  if (result.error) {
+    detailEl.innerHTML = '<div class="error">' + result.error + '</div>';
+    detailEl.classList.remove('hidden');
+    return;
+  }
+
+  detailEl.innerHTML = `
+    <div class="row"><span class="label">Formula</span><span>${escapeHtml(result.formulaUsed || '—')}</span></div>
+    <div class="row"><span class="label">Heat-plate time</span><span>${escapeHtml(result.heatPlateTime || '—')}</span></div>
+    <div class="row"><span class="label">Admin</span><span>${escapeHtml(result.admin)}</span></div>
+    <div class="row"><span class="label">Notes</span><span>${escapeHtml(result.notes || '—')}</span></div>
+    <div style="margin-top:8px; color:var(--text-dim);">Materials used:</div>
+    ${result.materials.length
+      ? result.materials.map(m => `<div class="row"><span class="label">${escapeHtml(m.name)}</span><span>${m.quantity}</span></div>`).join('')
+      : '<div class="empty">None recorded.</div>'}
+  `;
+  detailEl.classList.remove('hidden');
+}
+</script>
+</body>
+</html>

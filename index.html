@@ -803,6 +803,21 @@ function formatItemsList(itemsStr, quantitiesStr) {
   return items.map((item, i) => safeText(item) + ' ×' + safeText(quantities[i] || '?')).join('<br><br>');
 }
 
+// Same as formatItemsList, but also shows which batch each item came from
+// (blank for older orders placed before batch tracking existed, or items
+// whose product was never tagged with a batch).
+function formatItemsListWithBatch(itemsStr, quantitiesStr, batchIdsStr) {
+  const items = String(itemsStr || '').split(', ').filter(Boolean);
+  const quantities = String(quantitiesStr || '').split(',').map(q => q.trim()).filter(Boolean);
+  const batchIds = String(batchIdsStr || '').split(',').map(b => b.trim());
+  if (!items.length) return '';
+  return items.map((item, i) => {
+    const batch = batchIds[i];
+    const batchLine = batch ? '<br><span style="color:var(--text-dim); font-size:0.78rem;">Batch: ' + safeText(batch) + '</span>' : '';
+    return safeText(item) + ' ×' + safeText(quantities[i] || '?') + batchLine;
+  }).join('<br><br>');
+}
+
 function renderCatalog() {
   productGrid.innerHTML = '';
 
@@ -1316,7 +1331,7 @@ function renderMyOrders(orders) {
         <span class="order-row-total">${money(o.total)}</span>
       </div>
       <div class="order-row-meta">${o.date} · ${o.paymentMethod || 'Pending'} · ${o.status || 'Pending'}</div>
-      <div class="order-row-meta">${formatItemsList(o.items, o.quantities)}</div>
+      <div class="order-row-meta">${formatItemsListWithBatch(o.items, o.quantities, o.batchIds)}</div>
     </div>
   `).join('') + '<button class="secondary-btn" id="backToLookupBtn">Search again</button>';
 
