@@ -567,6 +567,26 @@ input[type="number"] {
 .order-row .order-row-id { font-family: Arial, Helvetica, sans-serif; font-weight: 700; color: var(--accent); font-size: 0.9rem; }
 .order-row .order-row-total { font-family: Arial, Helvetica, sans-serif; font-weight: 700; }
 .order-row .order-row-meta { font-size: 0.8rem; color: var(--text-dim); }
+
+.rewards-progress-track {
+  background: var(--surface-raised);
+  border-radius: 999px;
+  height: 12px;
+  width: 100%;
+  overflow: hidden;
+  margin: 10px 0 6px;
+}
+.rewards-progress-fill { background: var(--accent); height: 100%; transition: width 0.3s ease; }
+.rewards-code-row {
+  background: var(--surface-raised);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+}
 </style>
 </head>
 <body>
@@ -577,6 +597,7 @@ input[type="number"] {
 
 <div class="page">
   <header class="site" style="justify-content: flex-end; gap: 10px;">
+    <button class="cart-btn" id="myRewardsBtn" aria-label="View my rewards">My Rewards</button>
     <button class="cart-btn" id="myOrdersBtn" aria-label="View my orders">My Orders</button>
     <button class="cart-btn" id="openCartBtn" aria-label="Open cart">
       Cart <span class="count" id="cartCount">0</span>
@@ -634,6 +655,28 @@ input[type="number"] {
       <button class="primary-btn" id="lookupOrdersBtn">View orders</button>
     </div>
     <div id="myOrdersResults"></div>
+  </div>
+</div>
+
+<!-- My Rewards lookup -->
+<div class="overlay" id="myRewardsOverlay" hidden>
+  <div class="panel">
+    <button class="close-btn payment-close-btn" id="closeMyRewardsBtn" aria-label="Close">&times;</button>
+    <h2>My rewards</h2>
+    <p class="sub">Enter the phone number and PIN you used at checkout.</p>
+    <div id="myRewardsError"></div>
+    <div id="myRewardsForm">
+      <div class="field">
+        <label for="rewardsLookupPhone">Phone number</label>
+        <input type="tel" id="rewardsLookupPhone" placeholder="631-555-0199">
+      </div>
+      <div class="field">
+        <label for="rewardsLookupPin">PIN</label>
+        <input type="tel" id="rewardsLookupPin" placeholder="1234" maxlength="4">
+      </div>
+      <button class="primary-btn" id="lookupRewardsBtn">View rewards</button>
+    </div>
+    <div id="myRewardsResults"></div>
   </div>
 </div>
 
@@ -1338,6 +1381,84 @@ function renderMyOrders(orders) {
   document.getElementById('backToLookupBtn').addEventListener('click', () => {
     myOrdersResults.innerHTML = '';
     myOrdersForm.hidden = false;
+  });
+}
+
+/* ------------------------------------------------------------------------
+   My Rewards lookup (phone + PIN) — same PIN model as My Orders, scoped to
+   that one phone number's own loyalty data only.
+   ------------------------------------------------------------------------ */
+const myRewardsOverlay = document.getElementById('myRewardsOverlay');
+const myRewardsError = document.getElementById('myRewardsError');
+const myRewardsResults = document.getElementById('myRewardsResults');
+const myRewardsForm = document.getElementById('myRewardsForm');
+const lookupRewardsBtn = document.getElementById('lookupRewardsBtn');
+
+document.getElementById('myRewardsBtn').addEventListener('click', () => {
+  myRewardsError.innerHTML = '';
+  myRewardsResults.innerHTML = '';
+  myRewardsForm.hidden = false;
+  document.getElementById('rewardsLookupPhone').value = '';
+  document.getElementById('rewardsLookupPin').value = '';
+  myRewardsOverlay.hidden = false;
+});
+
+document.getElementById('closeMyRewardsBtn').addEventListener('click', () => {
+  myRewardsOverlay.hidden = true;
+});
+
+lookupRewardsBtn.addEventListener('click', async () => {
+  const phone = document.getElementById('rewardsLookupPhone').value.trim();
+  const pin = document.getElementById('rewardsLookupPin').value.trim();
+  myRewardsError.innerHTML = '';
+
+  if (!phone || !pin) {
+    myRewardsError.innerHTML = '<div class="error-box">Phone number and PIN are both required.</div>';
+    return;
+  }
+
+  lookupRewardsBtn.disabled = true;
+  lookupRewardsBtn.textContent = 'Looking up...';
+
+  try {
+    const progress = await apiPost({ action: 'getLoyaltyProgress', phone: phone, pin: pin });
+    if (progress.error) {
+      myRewardsError.innerHTML = '<div class="error-box">' + progress.error + '</div>';
+    } else {
+      renderMyRewards(progress);
+    }
+  } catch (err) {
+    myRewardsError.innerHTML = '<div class="error-box">Something went wrong: ' + err.message + '</div>';
+  }
+
+  lookupRewardsBtn.disabled = false;
+  lookupRewardsBtn.textContent = 'View rewards';
+});
+
+function renderMyRewards(progress) {
+  myRewardsForm.hidden = true;
+  const pct = Math.max(0, Math.min(100, progress.progressPercent));
+
+  const codesHtml = progress.unredeemedCodes.length
+    ? progress.unredeemedCodes.map(code => `<div class="rewards-code-row">${escapeHtml(code)} — $${progress.rewardAmount} off, ready to use</div>`).join('')
+    : '';
+
+  myRewardsResults.innerHTML = `
+    <div class="order-row">
+      <div class="order-row-top">
+        <span class="order-row-id">Total spent</span>
+        <span class="order-row-total">${money(progress.totalSpend)}</span>
+      </div>
+      <div class="rewards-progress-track"><div class="rewards-progress-fill" style="width:${pct}%;"></div></div>
+      <div class="order-row-meta">${money(progress.remainingToNext)} more to your next $${progress.rewardAmount} reward</div>
+    </div>
+    ${codesHtml}
+    <button class="secondary-btn" id="backToRewardsLookupBtn" style="margin-top:14px;">Search again</button>
+  `;
+
+  document.getElementById('backToRewardsLookupBtn').addEventListener('click', () => {
+    myRewardsResults.innerHTML = '';
+    myRewardsForm.hidden = false;
   });
 }
 

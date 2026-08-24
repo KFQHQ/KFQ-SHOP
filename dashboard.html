@@ -73,6 +73,18 @@
   .stat-card .label { font-size: 0.78rem; color: var(--text-dim); }
   .stat-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
 
+  .progress-bar-track {
+    background: var(--surface-raised);
+    border-radius: 999px;
+    height: 8px;
+    width: 100px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .progress-bar-fill { background: var(--accent); height: 100%; }
+  .progress-label { font-size: 0.75rem; color: var(--text-dim); margin-left: 6px; }
+
   .section {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -385,6 +397,21 @@
         </table>
       </div>
     </div>
+
+    <div class="section">
+      <div class="section-head"><h2 style="font-size:1.05rem;">Customer loyalty</h2></div>
+      <input type="text" id="loyaltySearchInput" placeholder="Search by name or phone..." style="margin-bottom:12px;">
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th><th>Phone</th><th>Confirmed Spend</th><th>Orders</th><th>Rewards</th><th>Progress to Next</th>
+            </tr>
+          </thead>
+          <tbody id="loyaltyTableBody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -488,6 +515,7 @@ const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xsc
 
 let dashboardPassword = '';
 let allProductsCache = [];
+let loyaltyCustomersCache = [];
 let editItems = []; // [{sku, name, flavor, price, quantity}]
 let editOrderId = '';
 let totalManuallyEdited = false;
@@ -557,6 +585,8 @@ async function unlock() {
     allProductsCache = products;
     populateAddItemSelect();
   }
+
+  loadLoyaltyCustomers();
 }
 
 async function refresh() {
@@ -992,6 +1022,52 @@ document.getElementById('submitCreateOrderBtn').addEventListener('click', async 
   setTimeout(() => {
     document.getElementById('createOrderModal').hidden = true;
   }, 1200);
+});
+
+/* ------------------------------------------------------------------------
+   Customer loyalty
+   ------------------------------------------------------------------------ */
+async function loadLoyaltyCustomers() {
+  const result = await apiPost({ action: 'getLoyaltyCustomers', password: dashboardPassword });
+  if (result.error) return;
+  loyaltyCustomersCache = result;
+  renderLoyaltyTable(loyaltyCustomersCache);
+}
+
+function renderLoyaltyTable(customers) {
+  const tbody = document.getElementById('loyaltyTableBody');
+  if (!customers.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No customers yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = customers.map(c => {
+    const pct = Math.max(0, Math.min(100, c.progressPercent));
+    return `
+      <tr>
+        <td>${escapeHtml(c.buyerName)}</td>
+        <td>${escapeHtml(c.phone)}</td>
+        <td>${money(c.totalSpend)}</td>
+        <td>${c.orderCount}</td>
+        <td>${c.rewardsUnredeemed} unredeemed / ${c.rewardsEarned} total</td>
+        <td>
+          <span class="progress-bar-track"><span class="progress-bar-fill" style="width:${pct}%;"></span></span>
+          <span class="progress-label">${money(c.remainingToNext)} to go</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+document.getElementById('loyaltySearchInput').addEventListener('input', (e) => {
+  const query = e.target.value.trim().toLowerCase();
+  if (!query) {
+    renderLoyaltyTable(loyaltyCustomersCache);
+    return;
+  }
+  const filtered = loyaltyCustomersCache.filter(c =>
+    String(c.buyerName).toLowerCase().includes(query) || String(c.phone).toLowerCase().includes(query)
+  );
+  renderLoyaltyTable(filtered);
 });
 </script>
 </body>
