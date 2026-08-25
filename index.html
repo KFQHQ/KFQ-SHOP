@@ -1533,33 +1533,55 @@ function renderSecretProducts(secretProducts) {
   const inStock = secretProducts.filter(p => Number(p.quantity) > 0);
   if (!inStock.length) return;
 
+  const groups = {};
+  inStock.forEach(product => {
+    const groupName = String(product.flavor || 'Other options').trim() || 'Other options';
+    if (!groups[groupName]) groups[groupName] = [];
+    groups[groupName].push(product);
+  });
+
+  const groupNames = Object.keys(groups);
+  if (!groupNames.length) return;
+
   secretSectionHead.hidden = false;
   secretGrid.hidden = false;
-  secretGrid.innerHTML = inStock.map(p => {
-    const img = toDriveDirectLink(p.imageUrl);
-    return `
-      <div class="card">
-        <div class="puff"></div>
-        <div class="card-img">
-          ${img ? `<img src="${img}" alt="${safeText(p.name)}" loading="lazy">` : `<span class="placeholder">No image</span>`}
-        </div>
-        <div class="card-body">
-          <h3>${safeText(p.name)}</h3>
-          <div class="flavor">${safeText(p.flavor || '')}</div>
-          <div class="card-foot">
-            <span class="price mono">${money(p.price)}</span>
-            <button class="add-btn" data-sku="${p.sku}">Add</button>
-          </div>
+  secretGrid.innerHTML = '';
+
+  groupNames.forEach(groupName => {
+    const groupProducts = groups[groupName];
+    const firstProduct = groupProducts[0];
+    const imageUrl = toDriveDirectLink(firstProduct.imageUrl);
+
+    const prices = groupProducts.map(product => Number(product.price));
+    const samePrice = prices.every(price => price === prices[0]);
+    const displayPrice = samePrice
+      ? money(prices[0]) + ' each'
+      : 'From ' + money(Math.min(...prices));
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="puff"></div>
+      <div class="card-img">
+        ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(groupName)}" loading="lazy">` : `<span class="placeholder">No image</span>`}
+      </div>
+      <div class="card-body">
+        <h3>${safeText(groupName)}</h3>
+        <div class="flavor">${groupProducts.length} available option${groupProducts.length === 1 ? '' : 's'}</div>
+        <div class="card-foot">
+          <span class="price mono">${displayPrice}</span>
+          <button class="add-btn">Choose</button>
         </div>
       </div>
     `;
-  }).join('');
 
-  secretGrid.querySelectorAll('.add-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const product = inStock.find(p => p.sku === btn.dataset.sku);
-      if (product) addToCart(product);
+    // Same grouped variant picker the normal catalog uses — real SKU, real
+    // stock cap, real price, and real cart behavior per variant, unchanged.
+    card.querySelector('.add-btn').addEventListener('click', () => {
+      openGroupSelector(groupName, groupProducts);
     });
+
+    secretGrid.appendChild(card);
   });
 }
 
