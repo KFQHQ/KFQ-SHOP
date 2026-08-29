@@ -180,23 +180,6 @@
   .status-badge.confirmed { background: rgba(63,217,199,0.18); color: var(--accent); }
   .status-badge.cancelled { background: rgba(225,85,63,0.18); color: var(--danger); }
 
-  .backup-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .backup-card .backup-main { display: flex; flex-direction: column; gap: 4px; }
-  .backup-card .backup-sub { font-size: 0.8rem; color: var(--text-dim); }
-  .backup-card .backup-note { font-size: 0.8rem; margin-top: 6px; }
-  .status-badge.ok { background: rgba(63,217,199,0.18); color: var(--accent); }
-  .status-badge.stale { background: rgba(232,150,60,0.18); color: var(--warm); }
-  .status-badge.failed { background: rgba(225,85,63,0.18); color: var(--danger); }
-  .status-badge.never { background: rgba(225,85,63,0.18); color: var(--danger); }
-  .backup-note.warn { color: var(--warm); }
-  .backup-note.bad { color: var(--danger); }
-
   .row-actions { display: flex; gap: 6px; }
   .action-btn {
     border: none;
@@ -375,17 +358,6 @@
       </div>
     </div>
 
-    <div class="section" id="backupSection">
-      <div class="section-head"><h2 style="font-size:1.05rem;">Backup health</h2></div>
-      <div class="backup-card">
-        <div class="backup-main">
-          <div id="backupStatusBadge">-</div>
-          <div class="backup-sub" id="backupLastSuccess">-</div>
-        </div>
-      </div>
-      <div class="backup-note" id="backupNote"></div>
-    </div>
-
     <div class="section" id="pendingSection">
       <div class="section-head"><h2 style="font-size:1.05rem;">Needs confirmation</h2></div>
       <div id="pendingAlert"></div>
@@ -456,6 +428,9 @@
       <input type="number" id="addItemQty" min="1" value="1">
       <button id="addItemBtn">Add</button>
     </div>
+    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-dim); font-weight:normal; margin:-4px 0 10px;">
+      <input type="checkbox" id="editShowArchivedCheckbox" style="width:auto;"> Show archived products
+    </label>
 
     <div class="modal-field">
       <label for="editTotalInput">Total ($)</label>
@@ -501,6 +476,9 @@
       <input type="number" id="createAddItemQty" min="1" value="1">
       <button id="createAddItemBtn">Add</button>
     </div>
+    <label style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-dim); font-weight:normal; margin:-4px 0 10px;">
+      <input type="checkbox" id="createShowArchivedCheckbox" style="width:auto;"> Show archived products
+    </label>
 
     <div class="modal-field">
       <label for="createDiscountCode">Discount code (optional)</label>
@@ -551,74 +529,6 @@ let createItems = []; // [{sku, name, flavor, price, quantity}]
 let createTotalManuallyEdited = false;
 
 function money(n) { return '$' + Number(n || 0).toFixed(2); }
-
-function formatBackupTimestamp(isoString) {
-  if (!isoString) return null;
-  const d = new Date(isoString);
-  if (isNaN(d.getTime())) return null;
-
-  const diffMs = Date.now() - d.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-  let relative;
-  if (diffHours < 1) {
-    relative = 'less than an hour ago';
-  } else if (diffHours < 24) {
-    const h = Math.floor(diffHours);
-    relative = h + ' hour' + (h === 1 ? '' : 's') + ' ago';
-  } else {
-    const days = Math.floor(diffHours / 24);
-    relative = days + ' day' + (days === 1 ? '' : 's') + ' ago';
-  }
-
-  const absolute = d.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  });
-
-  return { relative: relative, absolute: absolute };
-}
-
-function renderBackupStatus(backupStatus) {
-  const badgeEl = document.getElementById('backupStatusBadge');
-  const lastSuccessEl = document.getElementById('backupLastSuccess');
-  const noteEl = document.getElementById('backupNote');
-
-  if (!backupStatus) {
-    badgeEl.innerHTML = '';
-    lastSuccessEl.textContent = 'Backup status unavailable.';
-    noteEl.textContent = '';
-    return;
-  }
-
-  const labels = { ok: 'OK', stale: 'STALE', failed: 'FAILED', never: 'NEVER RUN' };
-  const label = labels[backupStatus.status] || backupStatus.status.toUpperCase();
-  badgeEl.innerHTML = `<span class="status-badge ${backupStatus.status}">${label}</span>`;
-
-  const last = formatBackupTimestamp(backupStatus.lastSuccessAt);
-  lastSuccessEl.textContent = last
-    ? `Last successful backup: ${last.absolute} (${last.relative})`
-    : 'No backup has completed successfully yet.';
-
-  const notes = [];
-  if (backupStatus.status === 'stale') {
-    notes.push(`It's been more than ${backupStatus.staleAfterHours} hours since the last successful backup — check that the daily trigger is still running.`);
-  }
-  if (backupStatus.status === 'failed') {
-    const failed = formatBackupTimestamp(backupStatus.lastFailureAt);
-    notes.push(`Most recent attempt${failed ? ' (' + failed.absolute + ')' : ''} failed${backupStatus.lastFailureMessage ? ': ' + backupStatus.lastFailureMessage : '.'}`);
-  }
-  if (backupStatus.status === 'never') {
-    notes.push('Run installDailyBackupTrigger() once in the Apps Script editor to turn on automatic daily backups.');
-  }
-  if (!backupStatus.triggerInstalled) {
-    notes.push('The daily backup trigger is not installed — backups will not run automatically until installDailyBackupTrigger() is run once in the Apps Script editor.');
-  }
-
-  const isBad = backupStatus.status === 'failed' || backupStatus.status === 'never' || !backupStatus.triggerInstalled;
-  const isWarn = !isBad && backupStatus.status === 'stale';
-  noteEl.className = 'backup-note' + (isBad ? ' bad' : isWarn ? ' warn' : '');
-  noteEl.textContent = notes.join(' ');
-}
 
 // Items and quantities are stored as parallel comma-separated lists (e.g.
 // "Tropicana Cookies - Standard 1ml, Apple Jack - Standard 1ml" paired with
@@ -676,13 +586,16 @@ async function unlock() {
   document.getElementById('dashboardContent').hidden = false;
   renderDashboard(result);
 
-  const products = await apiPost({ action: 'getAllProductsForOwner', password: dashboardPassword });
+  await reloadProductsCache(false);
+  loadLoyaltyCustomers();
+}
+
+async function reloadProductsCache(includeArchived) {
+  const products = await apiPost({ action: 'getAllProductsForOwner', includeArchived: includeArchived, password: dashboardPassword });
   if (!products.error) {
     allProductsCache = products;
     populateAddItemSelect();
   }
-
-  loadLoyaltyCustomers();
 }
 
 async function refresh() {
@@ -701,8 +614,6 @@ function renderDashboard(data) {
   document.getElementById('todayTotal').textContent = money(data.todayTotal);
   document.getElementById('weekCount').textContent = data.weekCount;
   document.getElementById('weekTotal').textContent = money(data.weekTotal);
-
-  renderBackupStatus(data.backupStatus);
 
   const pendingAlert = document.getElementById('pendingAlert');
   pendingAlert.innerHTML = data.pendingCount > 0
@@ -829,11 +740,18 @@ document.getElementById('refreshBtn').addEventListener('click', refresh);
 function populateAddItemSelect() {
   const optionsHtml = '<option value="">Add an item...</option>' +
     allProductsCache.map(p =>
-      `<option value="${p.sku}">${escapeHtml(p.name)}${p.flavor ? ' - ' + escapeHtml(p.flavor) : ''} ($${Number(p.price).toFixed(2)})</option>`
+      `<option value="${p.sku}">${escapeHtml(p.name)}${p.flavor ? ' - ' + escapeHtml(p.flavor) : ''} ($${Number(p.price).toFixed(2)})${p.archived ? ' [Archived]' : ''}</option>`
     ).join('');
   document.getElementById('addItemSelect').innerHTML = optionsHtml;
   document.getElementById('createAddItemSelect').innerHTML = optionsHtml;
 }
+
+document.getElementById('editShowArchivedCheckbox').addEventListener('change', (e) => {
+  reloadProductsCache(e.target.checked);
+});
+document.getElementById('createShowArchivedCheckbox').addEventListener('change', (e) => {
+  reloadProductsCache(e.target.checked);
+});
 
 function openEditModal(orderId, pendingOrders) {
   const order = pendingOrders.find(o => o.orderId === orderId);

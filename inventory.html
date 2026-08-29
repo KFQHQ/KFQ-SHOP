@@ -112,6 +112,17 @@ select {
   }
   .active-toggle-row button.is-active { background: var(--accent); color: #0A2320; }
   .active-toggle-row button.is-inactive { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .history-row {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+  }
+  .history-row-top { display: flex; justify-content: space-between; }
+  .history-row-meta { color: var(--text-dim); font-size: 0.75rem; margin-top: 2px; }
   .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
   .stat-row:last-child { border-bottom: none; }
   .stat-row .label { color: var(--text-dim); }
@@ -353,6 +364,25 @@ function renderFoundProduct() {
       </div>
       <div class="error" id="toggleActiveError"></div>
 
+      ${p.archived ? `
+        <div class="active-toggle-row" style="border-color: var(--danger);">
+          <span>Archived ${escapeHtml(String(p.archiveDate))}<br><span style="color:var(--text-dim); font-size:0.78rem;">${escapeHtml(p.archiveReason)}</span></span>
+          <button id="unarchiveBtn" class="is-inactive">Unarchive</button>
+        </div>
+        <div class="error" id="archiveError"></div>
+      ` : `
+        <div id="archiveSection" style="margin-top:10px;">
+          <input type="text" id="archiveReasonInput" placeholder="Reason for archiving">
+          <button class="secondary" id="archiveBtn" style="margin-top:6px;">Archive this product</button>
+          <div class="error" id="archiveError"></div>
+        </div>
+      `}
+
+      <div id="movementHistorySection" style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);">
+        <label style="color:var(--text-dim); font-size:0.8rem;">Recent movement history</label>
+        <div id="movementHistoryList"><p class="empty">Loading...</p></div>
+      </div>
+
       <div class="mode-tabs" style="margin-top:16px;">
         <button class="mode-tab active" data-mode="add">Add</button>
         <button class="mode-tab" data-mode="remove">Remove</button>
@@ -392,6 +422,14 @@ function renderFoundProduct() {
   `;
 
   document.getElementById('toggleActiveBtn').addEventListener('click', toggleActiveStatus);
+
+  if (p.archived) {
+    document.getElementById('unarchiveBtn').addEventListener('click', doUnarchive);
+  } else {
+    document.getElementById('archiveBtn').addEventListener('click', doArchive);
+  }
+
+  loadMovementHistory(p.sku);
 
   document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -441,6 +479,82 @@ async function toggleActiveStatus() {
   const btn = document.getElementById('toggleActiveBtn');
   btn.textContent = newActive ? 'Deactivate' : 'Activate';
   btn.className = newActive ? 'is-active' : 'is-inactive';
+}
+
+async function doArchive() {
+  const errorEl = document.getElementById('archiveError');
+  errorEl.textContent = '';
+  const reason = document.getElementById('archiveReasonInput').value.trim();
+  const adminName = document.getElementById('adminNameInput').value.trim();
+
+  if (!reason) {
+    errorEl.textContent = 'A reason is required to archive this product.';
+    return;
+  }
+
+  const result = await apiPost({
+    action: 'archiveProduct',
+    sku: currentProduct.sku,
+    reason: reason,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  currentProduct.archived = true;
+  currentProduct.archiveDate = result.archiveDate;
+  currentProduct.archiveReason = reason;
+  currentProduct.active = false;
+  renderFoundProduct();
+}
+
+async function doUnarchive() {
+  const errorEl = document.getElementById('archiveError');
+  errorEl.textContent = '';
+
+  const result = await apiPost({
+    action: 'unarchiveProduct',
+    sku: currentProduct.sku,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  currentProduct.archived = false;
+  currentProduct.archiveDate = '';
+  currentProduct.archiveReason = '';
+  renderFoundProduct();
+}
+
+async function loadMovementHistory(sku) {
+  const listEl = document.getElementById('movementHistoryList');
+  const history = await apiPost({ action: 'getInventoryMovementHistory', sku: sku, password: dashboardPassword });
+
+  if (history.error || !history.length) {
+    listEl.innerHTML = '<p class="empty">No movement history yet.</p>';
+    return;
+  }
+
+  listEl.innerHTML = history.map(h => {
+    const deltaText = h.amount === '' ? '' : (Number(h.amount) > 0 ? '+' + h.amount : h.amount);
+    return `
+      <div class="history-row">
+        <div class="history-row-top">
+          <span>${escapeHtml(h.action)}${deltaText ? ' (' + deltaText + ')' : ''}</span>
+          <span>${h.quantityBefore} → ${h.quantityAfter}</span>
+        </div>
+        <div class="history-row-meta">${escapeHtml(String(h.timestamp))}${h.admin ? ' · ' + escapeHtml(h.admin) : ''}${h.orderId ? ' · Order ' + escapeHtml(h.orderId) : ''}</div>
+        ${h.reason ? `<div class="history-row-meta">${escapeHtml(h.reason)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 function updatePreview() {
