@@ -203,6 +203,49 @@
     margin-bottom: 16px;
   }
 
+  .error-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+    cursor: pointer;
+    border: 1px solid;
+  }
+  .error-badge.healthy { background: rgba(63,217,199,0.12); border-color: var(--accent); color: var(--accent); }
+  .error-badge.recent { background: rgba(232,150,60,0.12); border-color: var(--warm); color: var(--warm); }
+  .error-badge.unresolved { background: rgba(225,85,63,0.12); border-color: var(--danger); color: var(--danger); }
+
+  .note-badge {
+    display: inline-block;
+    background: rgba(232,150,60,0.18);
+    color: var(--warm);
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    text-align: center;
+    line-height: 20px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    margin-left: 6px;
+  }
+
+  .error-row {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+  }
+  .error-row-top { display: flex; justify-content: space-between; }
+  .error-row-meta { color: var(--text-dim); font-size: 0.75rem; margin-top: 2px; }
+  .error-row.resolved { opacity: 0.5; }
+  .error-row button { width: auto; padding: 4px 10px; font-size: 0.72rem; margin-top: 6px; }
+
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -334,6 +377,10 @@
         <button class="refresh-btn" id="refreshBtn">Refresh</button>
       </div>
     </div>
+
+    <div id="errorBadge" class="error-badge hidden"></div>
+
+    <input type="text" id="globalSearchInput" placeholder="Search orders — Order ID, name, phone, SKU, product, status..." style="margin-bottom:16px;">
 
     <div class="stats-row">
       <div class="stat-card">
@@ -516,12 +563,40 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="errorListModal" hidden>
+  <div class="modal-panel">
+    <h2>Backend errors</h2>
+    <p class="modal-sub">Owner-only. Never shown or reachable from any customer-facing page.</p>
+    <div id="errorListBody"></div>
+    <div class="modal-btn-row">
+      <button class="close-modal-btn" id="closeErrorListBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="customerNoteModal" hidden>
+  <div class="modal-panel">
+    <h2>Customer note</h2>
+    <p class="modal-sub" id="customerNotePhoneLabel"></p>
+    <textarea id="customerNoteText" rows="4" placeholder="e.g. Prefers Venmo, usually picks up after 6pm, texts don't always go through"></textarea>
+    <p class="modal-sub" id="customerNoteMeta"></p>
+    <div class="error" id="customerNoteError"></div>
+    <div class="success" id="customerNoteSuccess"></div>
+    <div class="modal-btn-row">
+      <button class="save-btn" id="saveCustomerNoteBtn">Save note</button>
+      <button class="close-modal-btn" id="closeCustomerNoteBtn">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xscd7fTE5PpPWYGz8gdiTd-dTVwatXdXGzGJIKurl_ljUyyjI-IAQg/exec";
 
 let dashboardPassword = '';
 let allProductsCache = [];
 let loyaltyCustomersCache = [];
+let lastDashboardData = null;
+let searchDebounceTimer = null;
 let editItems = []; // [{sku, name, flavor, price, quantity}]
 let editOrderId = '';
 let totalManuallyEdited = false;
@@ -588,6 +663,7 @@ async function unlock() {
 
   await reloadProductsCache(false);
   loadLoyaltyCustomers();
+  loadErrorSummary();
 }
 
 async function reloadProductsCache(includeArchived) {
@@ -601,6 +677,7 @@ async function reloadProductsCache(includeArchived) {
 async function refresh() {
   const result = await apiPost({ action: 'getDashboardData', password: dashboardPassword });
   if (!result.error) renderDashboard(result);
+  loadErrorSummary();
 }
 
 function statusBadge(status) {
@@ -608,7 +685,10 @@ function statusBadge(status) {
   return `<span class="status-badge ${s}">${status || 'Pending'}</span>`;
 }
 
-function renderDashboard(data) {
+function renderDashboard(data, isSourceOfTruth) {
+  if (isSourceOfTruth !== false) {
+    lastDashboardData = data;
+  }
   document.getElementById('pendingCount').textContent = data.pendingCount;
   document.getElementById('todayCount').textContent = data.todayCount;
   document.getElementById('todayTotal').textContent = money(data.todayTotal);
@@ -629,7 +709,7 @@ function renderDashboard(data) {
         <td>${o.orderId}</td>
         <td>${o.date}</td>
         <td>${o.buyerName}</td>
-        <td>${o.phone}</td>
+        <td>${o.phone}${o.hasCustomerNote ? `<span class="note-badge" data-phone="${o.phone}" title="Customer note available">i</span>` : ''}</td>
         <td>${formatItemsList(o.items, o.quantities)}</td>
         <td>${money(o.total)}</td>
         <td>${o.paymentMethod || 'Pending'}</td>
@@ -647,6 +727,9 @@ function renderDashboard(data) {
     });
     pendingBody.querySelectorAll('.edit-btn').forEach(btn => {
       btn.addEventListener('click', () => openEditModal(btn.dataset.order, data.pendingOrders));
+    });
+    pendingBody.querySelectorAll('.note-badge').forEach(badge => {
+      badge.addEventListener('click', () => openCustomerNoteModal(badge.dataset.phone));
     });
   }
 
@@ -1084,6 +1167,162 @@ document.getElementById('loyaltySearchInput').addEventListener('input', (e) => {
     String(c.buyerName).toLowerCase().includes(query) || String(c.phone).toLowerCase().includes(query)
   );
   renderLoyaltyTable(filtered);
+});
+
+/* ------------------------------------------------------------------------
+   Quick order search — filters already-loaded dashboard data client-side.
+   No backend call at all, so no debounce is strictly needed for correctness;
+   a small one is added anyway just to avoid re-rendering on every keystroke.
+   ------------------------------------------------------------------------ */
+function matchesOrderSearch(order, query) {
+  const q = query.toLowerCase();
+  const normalizedQueryDigits = query.replace(/\D/g, '');
+
+  const haystack = [
+    order.orderId, order.buyerName, order.phone, order.items, order.skus, order.status
+  ].map(v => String(v || '')).join(' ').toLowerCase();
+
+  if (haystack.includes(q)) return true;
+
+  if (normalizedQueryDigits) {
+    const orderPhoneDigits = String(order.phone || '').replace(/\D/g, '');
+    if (orderPhoneDigits.includes(normalizedQueryDigits)) return true;
+  }
+  return false;
+}
+
+document.getElementById('globalSearchInput').addEventListener('input', (e) => {
+  clearTimeout(searchDebounceTimer);
+  const query = e.target.value.trim();
+
+  searchDebounceTimer = setTimeout(() => {
+    if (!lastDashboardData) return;
+
+    if (!query) {
+      renderDashboard(lastDashboardData, false);
+      return;
+    }
+
+    const filtered = Object.assign({}, lastDashboardData, {
+      pendingOrders: lastDashboardData.pendingOrders.filter(o => matchesOrderSearch(o, query)),
+      recentOrders: lastDashboardData.recentOrders.filter(o => matchesOrderSearch(o, query))
+    });
+    renderDashboard(filtered, false);
+  }, 150);
+});
+
+/* ------------------------------------------------------------------------
+   Error health badge
+   ------------------------------------------------------------------------ */
+async function loadErrorSummary() {
+  const result = await apiPost({ action: 'getErrorSummary', password: dashboardPassword });
+  const badge = document.getElementById('errorBadge');
+  if (result.error) {
+    badge.classList.add('hidden');
+    return;
+  }
+
+  badge.classList.remove('hidden');
+  if (result.unresolvedCount === 0) {
+    badge.className = 'error-badge healthy';
+    badge.textContent = '✓ No backend errors';
+  } else if (result.last24hCount > 0) {
+    badge.className = 'error-badge unresolved';
+    badge.textContent = '⚠ ' + result.todayCount + ' backend error' + (result.todayCount === 1 ? '' : 's') + ' today (' + result.unresolvedCount + ' unresolved)';
+  } else {
+    badge.className = 'error-badge recent';
+    badge.textContent = '⚠ ' + result.unresolvedCount + ' unresolved backend error' + (result.unresolvedCount === 1 ? '' : 's') + ' (none today)';
+  }
+  badge.onclick = openErrorListModal;
+}
+
+async function openErrorListModal() {
+  const result = await apiPost({ action: 'getRecentErrors', password: dashboardPassword });
+  const body = document.getElementById('errorListBody');
+  if (result.error) {
+    body.innerHTML = '<p class="empty">Could not load errors.</p>';
+  } else if (!result.length) {
+    body.innerHTML = '<p class="empty">No errors logged.</p>';
+  } else {
+    body.innerHTML = result.map(err => `
+      <div class="error-row ${err.resolved ? 'resolved' : ''}">
+        <div class="error-row-top"><span>${escapeHtml(err.context)}</span><span>${err.resolved ? 'Resolved' : ''}</span></div>
+        <div class="error-row-meta">${escapeHtml(String(err.timestamp))}</div>
+        <div class="error-row-meta">${escapeHtml(err.message)}</div>
+        ${!err.resolved ? `<button class="secondary" data-row="${err.rowIndex}">Mark resolved</button>` : ''}
+      </div>
+    `).join('');
+    body.querySelectorAll('button[data-row]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await apiPost({ action: 'markErrorResolved', rowIndex: Number(btn.dataset.row), password: dashboardPassword });
+        openErrorListModal();
+        loadErrorSummary();
+      });
+    });
+  }
+  document.getElementById('errorListModal').hidden = false;
+}
+
+document.getElementById('closeErrorListBtn').addEventListener('click', () => {
+  document.getElementById('errorListModal').hidden = true;
+});
+
+/* ------------------------------------------------------------------------
+   Customer notes — private, owner-only. Note text is never in the dashboard
+   payload; it's only fetched when this modal is explicitly opened.
+   ------------------------------------------------------------------------ */
+let currentNotePhone = '';
+
+async function openCustomerNoteModal(phone) {
+  currentNotePhone = phone;
+  document.getElementById('customerNotePhoneLabel').textContent = phone;
+  document.getElementById('customerNoteText').value = '';
+  document.getElementById('customerNoteMeta').textContent = 'Loading...';
+  document.getElementById('customerNoteError').textContent = '';
+  document.getElementById('customerNoteSuccess').textContent = '';
+  document.getElementById('customerNoteModal').hidden = false;
+
+  const result = await apiPost({ action: 'getCustomerNote', phone: phone, password: dashboardPassword });
+  if (result.error) {
+    document.getElementById('customerNoteMeta').textContent = '';
+    document.getElementById('customerNoteError').textContent = result.error;
+    return;
+  }
+  document.getElementById('customerNoteText').value = result.note || '';
+  document.getElementById('customerNoteMeta').textContent = result.lastUpdated
+    ? 'Last updated ' + result.lastUpdated + (result.updatedBy ? ' by ' + result.updatedBy : '')
+    : '';
+}
+
+document.getElementById('saveCustomerNoteBtn').addEventListener('click', async () => {
+  const errorEl = document.getElementById('customerNoteError');
+  const successEl = document.getElementById('customerNoteSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const note = document.getElementById('customerNoteText').value.trim();
+  const adminInput = document.getElementById('adminNameInput');
+  const adminName = adminInput ? adminInput.value.trim() : '';
+
+  const result = await apiPost({
+    action: 'saveCustomerNote',
+    phone: currentNotePhone,
+    note: note,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+  successEl.textContent = 'Saved.';
+  refresh();
+});
+
+document.getElementById('closeCustomerNoteBtn').addEventListener('click', () => {
+  document.getElementById('customerNoteModal').hidden = true;
 });
 </script>
 </body>
