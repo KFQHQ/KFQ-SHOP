@@ -167,6 +167,23 @@ select {
   .new-item-form .field { margin-bottom: 4px; }
   .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 0.9rem; }
   .checkbox-row input { width: auto; margin: 0; }
+
+  /* Private cost editor (owner-only; never shown on the storefront) */
+  .cost-box {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 14px 0;
+    font-size: 0.9rem;
+  }
+  .cost-box.missing { border-color: var(--warm); }
+  .cost-box-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .cost-box-head .hint { color: var(--text-dim); font-size: 0.75rem; }
+  .cost-box .cost-status { font-size: 0.8rem; margin-top: 4px; color: var(--text-dim); }
+  .cost-box.missing .cost-status { color: var(--warm); }
+  .cost-box input { margin: 8px 0 0; }
+  .cost-box .btn-row button { padding: 8px 14px; font-size: 0.82rem; }
 </style>
 </head>
 <body>
@@ -358,6 +375,21 @@ function renderFoundProduct() {
       <div class="stat-row"><span class="label">Low stock threshold</span><span>${p.lowStockThreshold}</span></div>
       <div class="stat-row"><span class="label">Price</span><span>$${Number(p.price).toFixed(2)}</span></div>
 
+      <div class="cost-box" id="costBox">
+        <div class="cost-box-head">
+          <strong>Cost per unit</strong>
+          <span class="hint">Private — owner only</span>
+        </div>
+        <div class="cost-status" id="costStatusText">Loading...</div>
+        <input type="number" id="costInput" min="0" step="0.01" placeholder="e.g. 6.50" disabled>
+        <div class="btn-row">
+          <button id="saveCostBtn" disabled>Save cost</button>
+          <button class="secondary" id="clearCostBtn" disabled>Clear cost</button>
+        </div>
+        <div class="error" id="costError"></div>
+        <div class="success" id="costSuccess"></div>
+      </div>
+
       <div class="active-toggle-row">
         <span>Status: <strong id="activeStatusText">${p.active ? 'Active' : 'Inactive'}</strong></span>
         <button id="toggleActiveBtn" class="${p.active ? 'is-active' : 'is-inactive'}">${p.active ? 'Deactivate' : 'Activate'}</button>
@@ -430,6 +462,9 @@ function renderFoundProduct() {
   }
 
   loadMovementHistory(p.sku);
+  loadProductCost(p.sku);
+  document.getElementById('saveCostBtn').addEventListener('click', () => saveProductCost(false));
+  document.getElementById('clearCostBtn').addEventListener('click', () => saveProductCost(true));
 
   document.querySelectorAll('.mode-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -455,6 +490,98 @@ document.getElementById('reasonSelect').addEventListener('change', (event) => {
     otherInput.value = '';
   }
 });
+}
+
+/* ---------------- Private cost per unit ----------------
+   Cost is fetched through its own owner-only action (getProductCost), not
+   through lookupProductForInventory — that lookup is also used by the
+   Internal Inventory page, which must never receive product cost. */
+function renderCostStatus(costPerUnit, costStatus) {
+  const box = document.getElementById('costBox');
+  const statusEl = document.getElementById('costStatusText');
+  const input = document.getElementById('costInput');
+  if (!box) return;
+  box.classList.toggle('missing', costStatus !== 'set');
+  if (costStatus === 'set') {
+    statusEl.textContent = 'Current: $' + Number(costPerUnit).toFixed(2) + ' per unit';
+    input.value = costPerUnit;
+  } else if (costStatus === 'invalid') {
+    statusEl.textContent = 'The Sheet has an invalid value here, so it counts as unknown. Enter a number to fix it.';
+    input.value = '';
+  } else {
+    statusEl.textContent = 'Cost not set. This product is left out of inventory cost and margin totals.';
+    input.value = '';
+  }
+}
+
+async function loadProductCost(sku) {
+  const statusEl = document.getElementById('costStatusText');
+  const result = await apiPost({ action: 'getProductCost', sku: sku, password: dashboardPassword });
+  // Ignore a late response if the owner has already looked up a different SKU.
+  if (!currentProduct || String(currentProduct.sku).toUpperCase() !== String(sku).toUpperCase()) return;
+  if (!statusEl) return;
+  if (result.error) {
+    statusEl.textContent = 'Could not load cost: ' + result.error;
+    return;
+  }
+  renderCostStatus(result.costPerUnit, result.costStatus);
+  document.getElementById('costInput').disabled = false;
+  document.getElementById('saveCostBtn').disabled = false;
+  document.getElementById('clearCostBtn').disabled = false;
+}
+
+async function saveProductCost(clear) {
+  const errorEl = document.getElementById('costError');
+  const successEl = document.getElementById('costSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const adminName = document.getElementById('adminNameInput').value.trim();
+  if (!adminName) {
+    errorEl.textContent = 'Enter your name at the top first.';
+    return;
+  }
+  localStorage.setItem('kfq_inventory_admin_name', adminName);
+
+  let costPerUnit = '';
+  if (!clear) {
+    const raw = document.getElementById('costInput').value.trim();
+    if (raw === '') {
+      errorEl.textContent = 'Enter a cost, or use Clear cost to mark it unknown.';
+      return;
+    }
+    const num = Number(raw);
+    if (!isFinite(num) || num < 0) {
+      errorEl.textContent = 'Enter a valid, non-negative cost.';
+      return;
+    }
+    costPerUnit = num;
+  }
+
+  const saveBtn = document.getElementById('saveCostBtn');
+  const clearBtn = document.getElementById('clearCostBtn');
+  saveBtn.disabled = true;
+  clearBtn.disabled = true;
+
+  const result = await apiPost({
+    action: 'setProductCost',
+    sku: currentProduct.sku,
+    costPerUnit: costPerUnit,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  saveBtn.disabled = false;
+  clearBtn.disabled = false;
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+  const saved = result.costPerUnit;
+  renderCostStatus(saved, saved === null ? 'missing' : 'set');
+  successEl.textContent = saved === null ? 'Cost cleared.' : 'Cost saved.';
+  loadMovementHistory(currentProduct.sku);
 }
 
 async function toggleActiveStatus() {
@@ -548,7 +675,7 @@ async function loadMovementHistory(sku) {
       <div class="history-row">
         <div class="history-row-top">
           <span>${escapeHtml(h.action)}${deltaText ? ' (' + deltaText + ')' : ''}</span>
-          <span>${h.quantityBefore} → ${h.quantityAfter}</span>
+          <span>${(h.quantityBefore === '' && h.quantityAfter === '') ? '' : h.quantityBefore + ' → ' + h.quantityAfter}</span>
         </div>
         <div class="history-row-meta">${escapeHtml(String(h.timestamp))}${h.admin ? ' · ' + escapeHtml(h.admin) : ''}${h.orderId ? ' · Order ' + escapeHtml(h.orderId) : ''}</div>
         ${h.reason ? `<div class="history-row-meta">${escapeHtml(h.reason)}</div>` : ''}
@@ -657,6 +784,8 @@ function renderNewItemForm(sku) {
       <input type="text" id="newFlavor">
       <label>Price</label>
       <input type="number" id="newPrice" min="0" step="0.01">
+      <label>Cost per unit (optional, private)</label>
+      <input type="number" id="newCostPerUnit" min="0" step="0.01" placeholder="Leave blank if unknown">
       <label>Initial Quantity</label>
       <input type="number" id="newQuantity" min="0" value="0">
       <label>Low Stock Threshold</label>
@@ -700,7 +829,8 @@ async function submitNewItem(sku) {
     lowStockThreshold: document.getElementById('newThreshold').value,
     imageUrl: document.getElementById('newImageUrl').value.trim(),
     active: document.getElementById('newActive').checked,
-    secret: document.getElementById('newSecret').checked
+    secret: document.getElementById('newSecret').checked,
+    costPerUnit: document.getElementById('newCostPerUnit').value.trim() // '' = unknown
   };
 
   const result = await apiPost({ action: 'addNewInventoryItem', fields: fields, password: dashboardPassword });

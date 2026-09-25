@@ -166,6 +166,37 @@
   }
 
   .empty { color: var(--text-dim); font-size: 0.85rem; padding: 12px 0; }
+
+  /* Inventory value (owner-only valuation of the public Products catalog) */
+  .valuation-sub { color: var(--text-dim); font-size: 0.8rem; margin: -8px 0 12px; }
+  .valuation-controls { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-dim); }
+  .valuation-controls input { width: auto; margin: 0; }
+  #valuationSection .stats-row { margin: 0 0 14px; }
+  .partial-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: rgba(232,150,60,0.18);
+    color: var(--warm);
+    vertical-align: middle;
+  }
+  .valuation-note {
+    border-left: 3px solid var(--warm);
+    background: rgba(232,150,60,0.08);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+  }
+  .valuation-note.info { border-left-color: var(--border); background: var(--surface-raised); color: var(--text-dim); }
+  .valuation-note.danger { border-left-color: var(--danger); background: rgba(225,85,63,0.08); }
+  tr.missing-cost td { background: rgba(232,150,60,0.06); }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .cost-missing-label { color: var(--warm); font-weight: 700; }
+  .valuation-status { color: var(--text-dim); font-size: 0.75rem; }
   #dashboardContent[hidden] { display: none; }
 
   .status-badge {
@@ -425,6 +456,47 @@
       <div id="lowStockList"></div>
     </div>
 
+    <div class="section" id="valuationSection">
+      <div class="section-head">
+        <h2 style="font-size:1.05rem;">Inventory value (public catalog)</h2>
+        <label class="valuation-controls">
+          <input type="checkbox" id="valuationIncludeArchived"> Include archived
+        </label>
+      </div>
+      <p class="valuation-sub">Private. Uses list prices as set in Products, before any discounts. Set costs in the Inventory Scan page.</p>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="label">Total units on hand</div>
+          <div class="value" id="valTotalUnits">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Potential sales value</div>
+          <div class="value" id="valSalesValue">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label" id="valCostLabel">Estimated inventory cost</div>
+          <div class="value" id="valCost">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="label" id="valMarginLabel">Estimated gross margin</div>
+          <div class="value" id="valMargin">-</div>
+          <div class="valuation-status" id="valMarginPct"></div>
+        </div>
+      </div>
+      <div id="valuationNotes"></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th><th>Status</th><th class="num">Units</th><th class="num">Price</th><th class="num">Cost/unit</th><th class="num">Cost value</th><th class="num">Sales value</th><th class="num">Margin</th>
+            </tr>
+          </thead>
+          <tbody id="valuationTableBody"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <a class="nav-link" href="./inventory.html" style="display:inline-block; margin-top:8px; color:var(--accent); font-size:0.82rem;">Open Inventory Scan to set costs →</a>
+    </div>
+
     <div class="section">
       <div class="section-head"><h2 style="font-size:1.05rem;">Internal inventory — low stock</h2></div>
       <div id="internalLowStockList"></div>
@@ -664,6 +736,7 @@ async function unlock() {
   await reloadProductsCache(false);
   loadLoyaltyCustomers();
   loadErrorSummary();
+  loadInventoryValuation();
 }
 
 async function reloadProductsCache(includeArchived) {
@@ -678,6 +751,7 @@ async function refresh() {
   const result = await apiPost({ action: 'getDashboardData', password: dashboardPassword });
   if (!result.error) renderDashboard(result);
   loadErrorSummary();
+  loadInventoryValuation();
 }
 
 function statusBadge(status) {
@@ -1122,6 +1196,92 @@ document.getElementById('submitCreateOrderBtn').addEventListener('click', async 
     document.getElementById('createOrderModal').hidden = true;
   }, 1200);
 });
+
+/* ------------------------------------------------------------------------
+   Inventory value — owner-only. Fetched through its own password-gated
+   action (getInventoryValuation); getDashboardData and
+   getAllProductsForOwner never carry cost. Cost and margin cover ONLY
+   products with a known cost; units and sales value cover everything in
+   scope. Missing-cost stock is reported separately.
+   ------------------------------------------------------------------------ */
+let valuationRequestSeq = 0;
+
+async function loadInventoryValuation() {
+  const includeArchived = document.getElementById('valuationIncludeArchived').checked;
+  const seq = ++valuationRequestSeq;
+  const result = await apiPost({ action: 'getInventoryValuation', includeArchived: includeArchived, password: dashboardPassword });
+  if (seq !== valuationRequestSeq) return; // a newer request (e.g. checkbox toggled) superseded this one
+  if (result.error) {
+    document.getElementById('valuationNotes').innerHTML =
+      `<div class="valuation-note danger">Could not load inventory value: ${escapeHtml(result.error)}</div>`;
+    document.getElementById('valuationTableBody').innerHTML = '<tr><td colspan="8" class="empty">Not available.</td></tr>';
+    return;
+  }
+  renderInventoryValuation(result);
+}
+
+function productStatusLabel(p) {
+  if (p.archived) return 'Archived';
+  const parts = [p.active ? 'Active' : 'Inactive'];
+  if (p.secret) parts.push('Secret');
+  return parts.join(', ');
+}
+
+function renderInventoryValuation(v) {
+  const partialTag = v.isPartial ? '<span class="partial-tag">Partial</span>' : '';
+  document.getElementById('valTotalUnits').textContent = Number(v.totalUnits).toLocaleString();
+  document.getElementById('valSalesValue').textContent = money(v.potentialSalesValue);
+  document.getElementById('valCostLabel').innerHTML = 'Estimated inventory cost' + partialTag;
+  document.getElementById('valMarginLabel').innerHTML = 'Estimated gross margin' + partialTag;
+  document.getElementById('valCost').textContent = v.costedSkuCount ? money(v.estimatedCost) : '—';
+  document.getElementById('valMargin').textContent = v.costedSkuCount ? money(v.estimatedGrossMargin) : '—';
+  document.getElementById('valMarginPct').textContent = (v.grossMarginPercent === null || !v.costedSkuCount)
+    ? ''
+    : v.grossMarginPercent.toFixed(1) + '% of costed sales value';
+
+  const notes = [];
+  if (!v.costedSkuCount && v.skuCount) {
+    notes.push(`<div class="valuation-note">No products have a cost yet, so cost and margin can't be estimated. Set costs in Inventory Scan.</div>`);
+  } else if (v.isPartial) {
+    notes.push(`<div class="valuation-note"><strong>Missing cost:</strong> ${v.missingCost.skuCount} product${v.missingCost.skuCount === 1 ? '' : 's'} with stock (${Number(v.missingCost.units).toLocaleString()} units, ${money(v.missingCost.salesValue)} sales value) ${v.missingCost.skuCount === 1 ? 'has' : 'have'} no cost set. ${v.missingCost.skuCount === 1 ? 'It is' : 'They are'} counted in units and sales value, but left out of cost and margin. Margin is calculated only over the ${money(v.costedSalesValue)} of stock that has a cost.</div>`);
+  }
+  if (v.missingCost.invalidCount > 0) {
+    notes.push(`<div class="valuation-note">${v.missingCost.invalidCount} product${v.missingCost.invalidCount === 1 ? ' has' : 's have'} an invalid value in the Cost Per Unit column and ${v.missingCost.invalidCount === 1 ? 'is' : 'are'} treated as unknown.</div>`);
+  }
+  if (v.negativeQuantityCount > 0) {
+    notes.push(`<div class="valuation-note danger">${v.negativeQuantityCount} product${v.negativeQuantityCount === 1 ? ' has' : 's have'} a negative quantity in the Sheet. ${v.negativeQuantityCount === 1 ? 'It counts' : 'They count'} as 0 units here; fix with a count or Set exact.</div>`);
+  }
+  if (v.archivedExcluded && v.archivedExcluded.skuCount > 0) {
+    notes.push(`<div class="valuation-note info">Excluding ${v.archivedExcluded.skuCount} archived product${v.archivedExcluded.skuCount === 1 ? '' : 's'} (${Number(v.archivedExcluded.units).toLocaleString()} units). Check Include archived to count them.</div>`);
+  }
+  document.getElementById('valuationNotes').innerHTML = notes.join('');
+
+  const tbody = document.getElementById('valuationTableBody');
+  if (!v.products.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No products in scope.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = v.products.map(p => {
+    const hasCost = p.costStatus === 'set';
+    const costCell = hasCost
+      ? money(p.costPerUnit)
+      : `<span class="cost-missing-label">${p.costStatus === 'invalid' ? 'Invalid' : 'Not set'}</span>`;
+    return `
+      <tr class="${hasCost ? '' : 'missing-cost'}">
+        <td>${escapeHtml(p.name)}${p.flavor ? ' — ' + escapeHtml(p.flavor) : ''}<br><span class="valuation-status">${escapeHtml(p.sku)}</span></td>
+        <td><span class="valuation-status">${productStatusLabel(p)}</span></td>
+        <td class="num">${Number(p.units).toLocaleString()}${p.quantity < 0 ? ` <span class="valuation-status">(${p.quantity})</span>` : ''}</td>
+        <td class="num">${money(p.price)}</td>
+        <td class="num">${costCell}</td>
+        <td class="num">${hasCost ? money(p.costValue) : '—'}</td>
+        <td class="num">${money(p.salesValue)}</td>
+        <td class="num">${hasCost ? money(p.margin) : '—'}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+document.getElementById('valuationIncludeArchived').addEventListener('change', loadInventoryValuation);
 
 /* ------------------------------------------------------------------------
    Customer loyalty
