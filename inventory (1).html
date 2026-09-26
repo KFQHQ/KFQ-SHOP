@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KFQ Shop — Inventory</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #101214;
+    --surface: #1B1E22;
+    --surface-raised: #24282D;
+    --border: #303539;
+    --text: #EDEAE3;
+    --text-dim: #9A9C9E;
+    --accent: #3FD9C7;
+    --warm: #E8963C;
+    --danger: #E1553F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  .wrap { max-width: 520px; margin: 0 auto; }
+  h1, h2 { margin: 0 0 4px; }
+
+  .gate {
+    max-width: 360px;
+    margin: 100px auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    text-align: center;
+  }
+input,
+select,
+textarea {
+  width: 100%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 1.05rem;
+  margin: 10px 0;
+  font-family: inherit;
+}
+  label { display: block; font-size: 0.8rem; color: var(--text-dim); margin: 12px 0 4px; }
+  button {
+    background: var(--accent);
+    color: #0A2320;
+    font-weight: 700;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+  button.secondary {
+    background: var(--surface-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  button.danger {
+    background: var(--surface-raised);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  button.link-btn { background: var(--surface-raised); color: var(--accent); border: 1px solid var(--accent); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-row button { flex: 1; }
+
+  .error { color: #F3A99A; font-size: 0.85rem; margin-top: 8px; }
+  .success { color: var(--accent); font-size: 0.85rem; margin-top: 8px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-top: 16px;
+  }
+  .product-name { font-size: 1.2rem; font-weight: 700; }
+  .product-flavor { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 10px; }
+  .product-img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    background: var(--surface-raised);
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .active-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 14px 0;
+    font-size: 0.9rem;
+  }
+  .active-toggle-row button {
+    width: auto;
+    padding: 7px 16px;
+    font-size: 0.82rem;
+  }
+  .active-toggle-row button.is-active { background: var(--accent); color: #0A2320; }
+  .active-toggle-row button.is-inactive { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+
+  .history-row {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+  }
+  .history-row-top { display: flex; justify-content: space-between; }
+  .history-row-meta { color: var(--text-dim); font-size: 0.75rem; margin-top: 2px; }
+  .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.9rem; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .label { color: var(--text-dim); }
+  .stat-row .value.low { color: var(--danger); font-weight: 700; }
+
+  .mode-tabs { display: flex; gap: 8px; margin: 16px 0 10px; }
+  .mode-tab {
+    flex: 1;
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mode-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(63,217,199,0.1); }
+
+  .preview { font-size: 0.9rem; color: var(--text-dim); margin: 8px 0 14px; }
+  .preview strong { color: var(--text); }
+
+  #scanner { margin: 14px 0; border-radius: 10px; overflow: hidden; }
+  .hidden { display: none !important; }
+
+  .count-session-banner {
+    background: rgba(63,217,199,0.1);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .count-session-stats { display: flex; gap: 16px; font-size: 0.85rem; margin-bottom: 10px; flex-wrap: wrap; }
+  .count-session-stats strong { color: var(--accent); }
+  .count-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-top: 16px; }
+  .count-diff { font-size: 1.4rem; font-weight: 700; margin: 10px 0; }
+  .count-diff.zero { color: var(--text-dim); }
+  .count-diff.positive { color: var(--accent); }
+  .count-diff.negative { color: var(--danger); }
+  .summary-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-top: 16px; text-align: center; }
+
+  .new-item-form .field { margin-bottom: 4px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; font-size: 0.9rem; }
+  .checkbox-row input { width: auto; margin: 0; }
+
+  /* Private cost editor (owner-only; never shown on the storefront) */
+  .cost-box {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 14px 0;
+    font-size: 0.9rem;
+  }
+  .cost-box.missing { border-color: var(--warm); }
+  .cost-box-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .cost-box-head .hint { color: var(--text-dim); font-size: 0.75rem; }
+  .cost-box .cost-status { font-size: 0.8rem; margin-top: 4px; color: var(--text-dim); }
+  .cost-box.missing .cost-status { color: var(--warm); }
+  .cost-box input { margin: 8px 0 0; }
+  .cost-box .btn-row button { padding: 8px 14px; font-size: 0.82rem; }
+
+  .empty { color: var(--text-dim); font-size: 0.85rem; padding: 8px 0; }
+
+  /* Store / Internal view switch. Deliberately NOT .mode-tab — the
+     add/remove/set tabs inside result cards are selected by that class. */
+  .view-toggle {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    gap: 4px;
+    margin: 14px 0 16px;
+  }
+  .view-toggle button {
+    flex: 1;
+    background: transparent;
+    color: var(--text-dim);
+    border: none;
+    border-radius: 999px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+  .view-toggle button[aria-pressed="true"] { background: var(--accent); color: #0A2320; }
+  .view-toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Internal supplies (formerly internal-inventory.html) */
+  .item-name { font-size: 1.2rem; font-weight: 700; }
+  .item-category { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 10px; }
+  .section-label { color: var(--text-dim); font-size: 0.8rem; margin: 16px 0 8px; display: block; padding-top: 14px; border-top: 1px solid var(--border); }
+  .low-stock-item {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .low-stock-item .info { display: flex; flex-direction: column; gap: 2px; font-size: 0.85rem; }
+  .low-stock-item .qty { color: var(--danger); font-weight: 700; }
+  .low-stock-item button { width: auto; padding: 6px 12px; font-size: 0.78rem; }
+  .section-head { display: flex; justify-content: space-between; align-items: center; }
+  .count-type-badge { color: var(--accent); font-size: 0.75rem; font-weight: 700; }
+  .other-system-hint { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); }
+  .other-system-hint button { margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="gate" id="gate">
+    <h2>Inventory</h2>
+    <p style="color:var(--text-dim); font-size:0.85rem;">Owner access only.</p>
+    <input type="password" id="passwordInput" placeholder="Password">
+    <button id="unlockBtn">Unlock</button>
+    <div class="error" id="gateError"></div>
+  </div>
+
+  <div id="toolContent" class="hidden">
+    <h1>Inventory</h1>
+    <p style="color:var(--text-dim); font-size:0.85rem;" id="viewSubtitle">Store products customers can buy. Scan or type a SKU to look it up.</p>
+
+    <label for="adminNameInput">Your name (required for the change log)</label>
+    <input type="text" id="adminNameInput" placeholder="e.g. Yianni">
+
+    <div class="view-toggle" role="group" aria-label="Which inventory to work in">
+      <button type="button" id="viewStoreBtn" data-view="store" aria-pressed="true">Store products</button>
+      <button type="button" id="viewInternalBtn" data-view="internal" aria-pressed="false">Internal supplies</button>
+    </div>
+
+    <div id="countSessionBanner" class="count-session-banner hidden">
+      <div class="count-session-stats">
+        <span><strong id="countSessionCounted">0</strong> counted</span>
+        <span><strong id="countSessionDiffs">0</strong> differences</span>
+        <span><strong id="countSessionNet">0</strong> net units</span>
+      </div>
+      <button class="secondary" id="endCountSessionBtn">End Session</button>
+    </div>
+    <button class="secondary" id="startCountSessionBtn" style="margin-bottom:14px;">Start Physical Count Session</button>
+
+    <label for="skuInput" id="skuLabel">SKU</label>
+    <input type="text" id="skuInput" placeholder="e.g. TERPBLAST-KFQ" autofocus>
+    <div class="btn-row">
+      <button id="lookupBtn">Look Up</button>
+      <button class="secondary" id="scanBtn">Scan</button>
+    </div>
+    <div id="scanner" class="hidden"></div>
+    <div class="error" id="lookupError"></div>
+
+    <div id="resultArea"></div>
+
+    <div class="card hidden" id="internalLowStockCard">
+      <div class="section-head" style="margin-bottom:10px;">
+        <h2 style="font-size:1rem;">Low stock</h2>
+      </div>
+      <div id="lowStockList"></div>
+      <button class="secondary" id="refreshLowStockBtn" style="margin-top:10px;">Refresh</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xscd7fTE5PpPWYGz8gdiTd-dTVwatXdXGzGJIKurl_ljUyyjI-IAQg/exec";
+
+let dashboardPassword = '';
+let html5QrScanner = null;
+let currentProduct = null;       // store product on screen (store view)
+let currentInternalItem = null;  // internal supply item on screen (internal view)
+let currentCountItem = null;     // item on the count card, from either system
+let currentMode = 'add';         // add / remove / set inside the current result card
+let countSession = null; // { sessionId, counted, diffs, net } — one session across both systems
+let currentCountItemType = 'store'; // which system the currently-displayed count item actually came from
+let inventoryView = 'store';     // 'store' | 'internal' — which system lookups and forms use
+let lookupSeq = 0;               // drops late lookup responses after a view switch or a newer lookup
+
+/* ---------------- Store / Internal view ----------------
+   The two systems stay completely separate on the backend: store view
+   calls only Products actions, internal view calls only Internal
+   Inventory actions. Store product cost is fetched only on the store
+   product card, never for internal items or count cards. */
+const VIEW_COPY = {
+  store: {
+    subtitle: 'Store products customers can buy. Scan or type a SKU to look it up.',
+    skuLabel: 'SKU',
+    placeholder: 'e.g. TERPBLAST-KFQ'
+  },
+  internal: {
+    subtitle: 'Internal supplies and back-stock. Never sold, never shown on the storefront.',
+    skuLabel: 'Internal SKU',
+    placeholder: 'e.g. SUPPLY-001'
+  }
+};
+
+function getInitialView() {
+  const fromUrl = new URLSearchParams(window.location.search).get('mode');
+  if (fromUrl === 'internal' || fromUrl === 'store') return fromUrl;
+  const saved = localStorage.getItem('kfq_inventory_view');
+  return saved === 'internal' ? 'internal' : 'store';
+}
+
+function setView(view, options) {
+  options = options || {};
+  inventoryView = view === 'internal' ? 'internal' : 'store';
+  localStorage.setItem('kfq_inventory_view', inventoryView);
+
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', inventoryView);
+  history.replaceState(null, '', url);
+
+  document.querySelectorAll('.view-toggle button').forEach(btn => {
+    btn.setAttribute('aria-pressed', String(btn.dataset.view === inventoryView));
+  });
+  const copy = VIEW_COPY[inventoryView];
+  document.getElementById('viewSubtitle').textContent = copy.subtitle;
+  document.getElementById('skuLabel').textContent = copy.skuLabel;
+  document.getElementById('skuInput').placeholder = copy.placeholder;
+
+  document.getElementById('internalLowStockCard').classList.toggle('hidden', inventoryView !== 'internal');
+
+  if (!options.keepResult) {
+    lookupSeq++; // any in-flight lookup is now stale
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('lookupError').textContent = '';
+    currentProduct = null;
+    currentInternalItem = null;
+  }
+  if (inventoryView === 'internal' && dashboardPassword) loadInternalLowStock();
+}
+
+document.querySelectorAll('.view-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.view === inventoryView) return;
+    setView(btn.dataset.view);
+    document.getElementById('skuInput').focus();
+  });
+});
+
+async function apiPost(body) {
+  const res = await fetch(API_BASE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+function escapeHtml(value) {
+  const div = document.createElement('div');
+  div.textContent = String(value || '');
+  return div.innerHTML;
+}
+
+// Same conversion used on the main storefront — turns a Drive "share" link
+// into something actually viewable as an <img> src.
+function toDriveDirectLink(url) {
+  if (!url) return '';
+  const match = String(url).match(/\/file\/d\/([^/]+)/);
+  if (match) {
+    return 'https://drive.google.com/thumbnail?id=' + match[1] + '&sz=w1000';
+  }
+  return url;
+}
+
+/* ---------------- Password gate ---------------- */
+async function unlock() {
+  const pw = document.getElementById('passwordInput').value;
+  const errorEl = document.getElementById('gateError');
+  errorEl.textContent = '';
+
+  const result = await apiPost({ action: 'getDashboardData', password: pw });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  dashboardPassword = pw;
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('toolContent').classList.remove('hidden');
+
+  const savedName = localStorage.getItem('kfq_inventory_admin_name');
+  if (savedName) document.getElementById('adminNameInput').value = savedName;
+
+  restoreCountSessionFromStorage();
+  setView(getInitialView());
+
+  document.getElementById('skuInput').focus();
+}
+
+function saveCountSessionToStorage() {
+  if (countSession) {
+    localStorage.setItem('kfq_active_count_session', JSON.stringify(countSession));
+  }
+}
+
+function restoreCountSessionFromStorage() {
+  const saved = localStorage.getItem('kfq_active_count_session');
+  if (!saved) return;
+  try {
+    countSession = JSON.parse(saved);
+    updateCountSessionBanner();
+    document.getElementById('countSessionBanner').classList.remove('hidden');
+    document.getElementById('startCountSessionBtn').classList.add('hidden');
+  } catch (e) {
+    localStorage.removeItem('kfq_active_count_session');
+  }
+}
+
+document.getElementById('adminNameInput').addEventListener('input', (e) => {
+  localStorage.setItem('kfq_inventory_admin_name', e.target.value);
+});
+
+document.getElementById('unlockBtn').addEventListener('click', unlock);
+document.getElementById('passwordInput').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
+
+/* ---------------- Lookup ---------------- */
+document.getElementById('lookupBtn').addEventListener('click', doLookup);
+document.getElementById('skuInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLookup(); });
+
+/**
+ * Looks a SKU up in one system. Returns { type, item } when found, null when
+ * not found, and throws on a backend error. Each system only ever uses its
+ * own lookup action.
+ */
+async function lookupInSystem(type, sku) {
+  if (type === 'store') {
+    const r = await apiPost({ action: 'lookupProductForInventory', sku: sku, password: dashboardPassword });
+    if (r.error) throw new Error(r.error);
+    return r.found ? { type: 'store', item: r.product } : null;
+  }
+  const r = await apiPost({ action: 'lookupInternalItem', sku: sku, password: dashboardPassword });
+  if (r.error) throw new Error(r.error);
+  return r.found ? { type: 'backstock', item: r.item } : null;
+}
+
+async function doLookup() {
+  const sku = document.getElementById('skuInput').value.trim();
+  const errorEl = document.getElementById('lookupError');
+  errorEl.textContent = '';
+  document.getElementById('resultArea').innerHTML = '';
+  if (!sku) return;
+
+  const seq = ++lookupSeq;
+  const view = inventoryView;
+  const primaryType = view === 'store' ? 'store' : 'internal';
+
+  let hit;
+  try {
+    hit = await lookupInSystem(primaryType, sku);
+  } catch (err) {
+    if (seq !== lookupSeq) return;
+    errorEl.textContent = err.message;
+    return;
+  }
+  if (seq !== lookupSeq) return;
+
+  if (hit) {
+    showLookupHit(hit);
+    return;
+  }
+
+  // Not in the current view's system. During an active count session this
+  // is one continuous session across both systems, so also check the other
+  // system before giving up (same behavior both pages had before the merge).
+  // Outside a session, stay scoped to the current view.
+  if (countSession) {
+    let other = null;
+    try {
+      other = await lookupInSystem(primaryType === 'store' ? 'internal' : 'store', sku);
+    } catch (err) {
+      other = null; // secondary lookup errors are ignored, as before
+    }
+    if (seq !== lookupSeq) return;
+    if (other) {
+      showLookupHit(other);
+      return;
+    }
+  }
+
+  if (view === 'store') renderNotFound(sku);
+  else internalRenderNotFound(sku);
+}
+
+function showLookupHit(hit) {
+  currentCountItemType = hit.type;
+  if (countSession) {
+    currentCountItem = hit.item;
+    renderCountCard();
+    return;
+  }
+  if (hit.type === 'store') {
+    currentProduct = hit.item;
+    renderFoundProduct();
+  } else {
+    currentInternalItem = hit.item;
+    internalRenderFoundItem();
+  }
+}
+
+/** Hint on a not-found card: search the same SKU in the other system. */
+function otherSystemHintHtml(targetView) {
+  const label = targetView === 'internal' ? 'Internal supplies' : 'Store products';
+  return `
+    <div class="other-system-hint">
+      Looking for ${targetView === 'internal' ? 'a supply item' : 'a store product'}?
+      <button class="secondary" id="searchOtherSystemBtn">Search ${label} instead</button>
+    </div>
+  `;
+}
+
+function wireOtherSystemHint(targetView) {
+  const btn = document.getElementById('searchOtherSystemBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    setView(targetView);
+    doLookup();
+  });
+}
+
+/* ---------------- Found: adjust quantity ---------------- */
+function renderFoundProduct() {
+  const p = currentProduct;
+  currentMode = 'add';
+  const isLow = p.quantity <= p.lowStockThreshold;
+  const img = toDriveDirectLink(p.imageUrl);
+
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card">
+      ${img ? `<img src="${img}" alt="${escapeHtml(p.name)}" class="product-img">` : ''}
+      <div class="product-name">${escapeHtml(p.name)}</div>
+      <div class="product-flavor">${escapeHtml(p.flavor || '')}</div>
+      <div class="stat-row"><span class="label">Current stock</span><span class="value ${isLow ? 'low' : ''}" id="currentQtyDisplay">${p.quantity}</span></div>
+      <div class="stat-row"><span class="label">Low stock threshold</span><span>${p.lowStockThreshold}</span></div>
+      <div class="stat-row"><span class="label">Price</span><span>$${Number(p.price).toFixed(2)}</span></div>
+
+      <div class="cost-box" id="costBox">
+        <div class="cost-box-head">
+          <strong>Cost per unit</strong>
+          <span class="hint">Private — owner only</span>
+        </div>
+        <div class="cost-status" id="costStatusText">Loading...</div>
+        <input type="number" id="costInput" min="0" step="0.01" placeholder="e.g. 6.50" disabled>
+        <div class="btn-row">
+          <button id="saveCostBtn" disabled>Save cost</button>
+          <button class="secondary" id="clearCostBtn" disabled>Clear cost</button>
+        </div>
+        <div class="error" id="costError"></div>
+        <div class="success" id="costSuccess"></div>
+      </div>
+
+      <div class="active-toggle-row">
+        <span>Status: <strong id="activeStatusText">${p.active ? 'Active' : 'Inactive'}</strong></span>
+        <button id="toggleActiveBtn" class="${p.active ? 'is-active' : 'is-inactive'}">${p.active ? 'Deactivate' : 'Activate'}</button>
+      </div>
+      <div class="error" id="toggleActiveError"></div>
+
+      ${p.archived ? `
+        <div class="active-toggle-row" style="border-color: var(--danger);">
+          <span>Archived ${escapeHtml(String(p.archiveDate))}<br><span style="color:var(--text-dim); font-size:0.78rem;">${escapeHtml(p.archiveReason)}</span></span>
+          <button id="unarchiveBtn" class="is-inactive">Unarchive</button>
+        </div>
+        <div class="error" id="archiveError"></div>
+      ` : `
+        <div id="archiveSection" style="margin-top:10px;">
+          <input type="text" id="archiveReasonInput" placeholder="Reason for archiving">
+          <button class="secondary" id="archiveBtn" style="margin-top:6px;">Archive this product</button>
+          <div class="error" id="archiveError"></div>
+        </div>
+      `}
+
+      <div id="movementHistorySection" style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);">
+        <label style="color:var(--text-dim); font-size:0.8rem;">Recent movement history</label>
+        <div id="movementHistoryList"><p class="empty">Loading...</p></div>
+      </div>
+
+      <div class="mode-tabs" style="margin-top:16px;">
+        <button class="mode-tab active" data-mode="add">Add</button>
+        <button class="mode-tab" data-mode="remove">Remove</button>
+        <button class="mode-tab" data-mode="set">Set exact</button>
+      </div>
+
+<label for="amountInput" id="amountLabel">Amount to add</label>
+<input type="number" id="amountInput" min="0" placeholder="0">
+
+<div class="preview" id="preview">
+  New quantity will be <strong>${p.quantity}</strong>
+</div>
+
+<label for="reasonSelect">Reason <span style="color: var(--danger);">*</span></label>
+<select id="reasonSelect">
+  <option value="">Select a reason...</option>
+  <option value="Restock">Restock</option>
+  <option value="Damaged item">Damaged item</option>
+  <option value="Personal use">Personal use</option>
+  <option value="Correction">Correction</option>
+  <option value="Physical count adjustment">Physical count adjustment</option>
+  <option value="Other">Other</option>
+</select>
+
+<input
+  type="text"
+  id="reasonOtherInput"
+  class="hidden"
+  maxlength="160"
+  placeholder="Describe the reason"
+>
+
+<button id="applyBtn">Apply</button>
+<div class="error" id="applyError"></div>
+<div class="success" id="applySuccess"></div>
+    </div>
+  `;
+
+  document.getElementById('toggleActiveBtn').addEventListener('click', toggleActiveStatus);
+
+  if (p.archived) {
+    document.getElementById('unarchiveBtn').addEventListener('click', doUnarchive);
+  } else {
+    document.getElementById('archiveBtn').addEventListener('click', doArchive);
+  }
+
+  loadMovementHistory(p.sku);
+  loadProductCost(p.sku);
+  document.getElementById('saveCostBtn').addEventListener('click', () => saveProductCost(false));
+  document.getElementById('clearCostBtn').addEventListener('click', () => saveProductCost(true));
+
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentMode = tab.dataset.mode;
+      const labelMap = { add: 'Amount to add', remove: 'Amount to remove', set: 'New exact quantity' };
+      document.getElementById('amountLabel').textContent = labelMap[currentMode];
+      updatePreview();
+    });
+  });
+
+ document.getElementById('amountInput').addEventListener('input', updatePreview);
+document.getElementById('applyBtn').addEventListener('click', applyAdjustment);
+
+document.getElementById('reasonSelect').addEventListener('change', (event) => {
+  const otherInput = document.getElementById('reasonOtherInput');
+  const isOther = event.target.value === 'Other';
+
+  otherInput.classList.toggle('hidden', !isOther);
+
+  if (!isOther) {
+    otherInput.value = '';
+  }
+});
+}
+
+/* ---------------- Private cost per unit ----------------
+   Cost is fetched through its own owner-only action (getProductCost), not
+   through lookupProductForInventory — that lookup is also used by the
+   Internal Inventory page, which must never receive product cost. */
+function renderCostStatus(costPerUnit, costStatus) {
+  const box = document.getElementById('costBox');
+  const statusEl = document.getElementById('costStatusText');
+  const input = document.getElementById('costInput');
+  if (!box) return;
+  box.classList.toggle('missing', costStatus !== 'set');
+  if (costStatus === 'set') {
+    statusEl.textContent = 'Current: $' + Number(costPerUnit).toFixed(2) + ' per unit';
+    input.value = costPerUnit;
+  } else if (costStatus === 'invalid') {
+    statusEl.textContent = 'The Sheet has an invalid value here, so it counts as unknown. Enter a number to fix it.';
+    input.value = '';
+  } else {
+    statusEl.textContent = 'Cost not set. This product is left out of inventory cost and margin totals.';
+    input.value = '';
+  }
+}
+
+async function loadProductCost(sku) {
+  const statusEl = document.getElementById('costStatusText');
+  const result = await apiPost({ action: 'getProductCost', sku: sku, password: dashboardPassword });
+  // Ignore a late response if the owner has already looked up a different SKU.
+  if (!currentProduct || String(currentProduct.sku).toUpperCase() !== String(sku).toUpperCase()) return;
+  if (!statusEl) return;
+  if (result.error) {
+    statusEl.textContent = 'Could not load cost: ' + result.error;
+    return;
+  }
+  renderCostStatus(result.costPerUnit, result.costStatus);
+  document.getElementById('costInput').disabled = false;
+  document.getElementById('saveCostBtn').disabled = false;
+  document.getElementById('clearCostBtn').disabled = false;
+}
+
+async function saveProductCost(clear) {
+  const errorEl = document.getElementById('costError');
+  const successEl = document.getElementById('costSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const adminName = document.getElementById('adminNameInput').value.trim();
+  if (!adminName) {
+    errorEl.textContent = 'Enter your name at the top first.';
+    return;
+  }
+  localStorage.setItem('kfq_inventory_admin_name', adminName);
+
+  let costPerUnit = '';
+  if (!clear) {
+    const raw = document.getElementById('costInput').value.trim();
+    if (raw === '') {
+      errorEl.textContent = 'Enter a cost, or use Clear cost to mark it unknown.';
+      return;
+    }
+    const num = Number(raw);
+    if (!isFinite(num) || num < 0) {
+      errorEl.textContent = 'Enter a valid, non-negative cost.';
+      return;
+    }
+    costPerUnit = num;
+  }
+
+  const saveBtn = document.getElementById('saveCostBtn');
+  const clearBtn = document.getElementById('clearCostBtn');
+  saveBtn.disabled = true;
+  clearBtn.disabled = true;
+
+  const result = await apiPost({
+    action: 'setProductCost',
+    sku: currentProduct.sku,
+    costPerUnit: costPerUnit,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  saveBtn.disabled = false;
+  clearBtn.disabled = false;
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+  const saved = result.costPerUnit;
+  renderCostStatus(saved, saved === null ? 'missing' : 'set');
+  successEl.textContent = saved === null ? 'Cost cleared.' : 'Cost saved.';
+  loadMovementHistory(currentProduct.sku);
+}
+
+async function toggleActiveStatus() {
+  const errorEl = document.getElementById('toggleActiveError');
+  errorEl.textContent = '';
+  const newActive = !currentProduct.active;
+
+  const result = await apiPost({
+    action: 'setProductActive',
+    sku: currentProduct.sku,
+    active: newActive,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  currentProduct.active = newActive;
+  document.getElementById('activeStatusText').textContent = newActive ? 'Active' : 'Inactive';
+  const btn = document.getElementById('toggleActiveBtn');
+  btn.textContent = newActive ? 'Deactivate' : 'Activate';
+  btn.className = newActive ? 'is-active' : 'is-inactive';
+}
+
+async function doArchive() {
+  const errorEl = document.getElementById('archiveError');
+  errorEl.textContent = '';
+  const reason = document.getElementById('archiveReasonInput').value.trim();
+  const adminName = document.getElementById('adminNameInput').value.trim();
+
+  if (!reason) {
+    errorEl.textContent = 'A reason is required to archive this product.';
+    return;
+  }
+
+  const result = await apiPost({
+    action: 'archiveProduct',
+    sku: currentProduct.sku,
+    reason: reason,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  currentProduct.archived = true;
+  currentProduct.archiveDate = result.archiveDate;
+  currentProduct.archiveReason = reason;
+  currentProduct.active = false;
+  renderFoundProduct();
+}
+
+async function doUnarchive() {
+  const errorEl = document.getElementById('archiveError');
+  errorEl.textContent = '';
+
+  const result = await apiPost({
+    action: 'unarchiveProduct',
+    sku: currentProduct.sku,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  currentProduct.archived = false;
+  currentProduct.archiveDate = '';
+  currentProduct.archiveReason = '';
+  renderFoundProduct();
+}
+
+async function loadMovementHistory(sku) {
+  const listEl = document.getElementById('movementHistoryList');
+  const history = await apiPost({ action: 'getInventoryMovementHistory', sku: sku, password: dashboardPassword });
+
+  if (history.error || !history.length) {
+    listEl.innerHTML = '<p class="empty">No movement history yet.</p>';
+    return;
+  }
+
+  listEl.innerHTML = history.map(h => {
+    const deltaText = h.amount === '' ? '' : (Number(h.amount) > 0 ? '+' + h.amount : h.amount);
+    return `
+      <div class="history-row">
+        <div class="history-row-top">
+          <span>${escapeHtml(h.action)}${deltaText ? ' (' + deltaText + ')' : ''}</span>
+          <span>${(h.quantityBefore === '' && h.quantityAfter === '') ? '' : h.quantityBefore + ' → ' + h.quantityAfter}</span>
+        </div>
+        <div class="history-row-meta">${escapeHtml(String(h.timestamp))}${h.admin ? ' · ' + escapeHtml(h.admin) : ''}${h.orderId ? ' · Order ' + escapeHtml(h.orderId) : ''}</div>
+        ${h.reason ? `<div class="history-row-meta">${escapeHtml(h.reason)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function updatePreview() {
+  const amt = Number(document.getElementById('amountInput').value) || 0;
+  let newQty = currentProduct.quantity;
+  if (currentMode === 'add') newQty = currentProduct.quantity + amt;
+  else if (currentMode === 'remove') newQty = Math.max(0, currentProduct.quantity - amt);
+  else if (currentMode === 'set') newQty = amt;
+  document.getElementById('preview').innerHTML = 'New quantity will be: <strong>' + newQty + '</strong>';
+}
+
+async function applyAdjustment() {
+  const amt = document.getElementById('amountInput').value;
+  const applyError = document.getElementById('applyError');
+  const applySuccess = document.getElementById('applySuccess');
+
+  applyError.textContent = '';
+  applySuccess.textContent = '';
+
+  const adminName = document.getElementById('adminNameInput').value.trim();
+  const reasonSelected = document.getElementById('reasonSelect').value;
+  const reasonOther = document.getElementById('reasonOtherInput').value.trim();
+
+  const reason = reasonSelected === 'Other'
+    ? reasonOther
+    : reasonSelected;
+
+  if (amt === '' || Number(amt) < 0) {
+    applyError.textContent = 'Enter a valid amount.';
+    return;
+  }
+
+  if (!adminName) {
+    applyError.textContent = 'Enter your name at the top of the page first.';
+    return;
+  }
+
+  if (!reason) {
+    applyError.textContent = 'Select a reason or describe one if you chose Other.';
+    return;
+  }
+
+  const result = await apiPost({
+    action: 'adjustInventoryQuantity',
+    sku: currentProduct.sku,
+    mode: currentMode,
+    amount: amt,
+    reason: reason,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    applyError.textContent = result.error;
+    return;
+  }
+
+  applySuccess.textContent = 'Updated — new quantity: ' + result.quantity;
+  currentProduct.quantity = result.quantity;
+  document.getElementById('currentQtyDisplay').textContent = result.quantity;
+  document.getElementById('amountInput').value = '';
+  document.getElementById('reasonSelect').value = '';
+  document.getElementById('reasonOtherInput').value = '';
+  document.getElementById('reasonOtherInput').classList.add('hidden');
+
+  updatePreview();
+
+  setTimeout(() => {
+    document.getElementById('skuInput').value = '';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('skuInput').focus();
+  }, 1400);
+}
+
+/* ---------------- Not found: add new item ---------------- */
+function renderNotFound(sku) {
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card">
+      <p>SKU <strong>${escapeHtml(sku)}</strong> was not found.</p>
+      <p style="color:var(--text-dim); font-size:0.85rem;">Add it as a new product?</p>
+      <div class="btn-row">
+        <button id="addNewYesBtn">Yes, add it</button>
+        <button class="secondary" id="addNewNoBtn">No</button>
+      </div>
+      <div id="newItemFormArea"></div>
+      ${otherSystemHintHtml('internal')}
+    </div>
+  `;
+  document.getElementById('addNewNoBtn').addEventListener('click', () => {
+    document.getElementById('resultArea').innerHTML = '';
+  });
+  document.getElementById('addNewYesBtn').addEventListener('click', () => renderNewItemForm(sku));
+  wireOtherSystemHint('internal');
+}
+
+function renderNewItemForm(sku) {
+  document.getElementById('newItemFormArea').innerHTML = `
+    <div class="new-item-form">
+      <label>Product Name</label>
+      <input type="text" id="newName">
+      <label>Flavor</label>
+      <input type="text" id="newFlavor">
+      <label>Price</label>
+      <input type="number" id="newPrice" min="0" step="0.01">
+      <label>Cost per unit (optional, private)</label>
+      <input type="number" id="newCostPerUnit" min="0" step="0.01" placeholder="Leave blank if unknown">
+      <label>Initial Quantity</label>
+      <input type="number" id="newQuantity" min="0" value="0">
+      <label>Low Stock Threshold</label>
+      <input type="number" id="newThreshold" min="0" value="5">
+      <label>Image URL (optional)</label>
+      <input type="text" id="newImageUrl">
+      <div class="checkbox-row">
+        <input type="checkbox" id="newActive">
+        <label style="margin:0;">Active (visible on the storefront) — off by default</label>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="newSecret">
+        <label style="margin:0;">Secret listing</label>
+      </div>
+      <button id="submitNewItemBtn" style="margin-top:10px;">Add Product</button>
+      <div class="error" id="newItemError"></div>
+      <div class="success" id="newItemSuccess"></div>
+    </div>
+  `;
+  document.getElementById('submitNewItemBtn').addEventListener('click', () => submitNewItem(sku));
+}
+
+async function submitNewItem(sku) {
+  const errorEl = document.getElementById('newItemError');
+  const successEl = document.getElementById('newItemSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const name = document.getElementById('newName').value.trim();
+  if (!name) {
+    errorEl.textContent = 'Product name is required.';
+    return;
+  }
+
+  const fields = {
+    sku: sku,
+    name: name,
+    flavor: document.getElementById('newFlavor').value.trim(),
+    price: document.getElementById('newPrice').value,
+    quantity: document.getElementById('newQuantity').value,
+    lowStockThreshold: document.getElementById('newThreshold').value,
+    imageUrl: document.getElementById('newImageUrl').value.trim(),
+    active: document.getElementById('newActive').checked,
+    secret: document.getElementById('newSecret').checked,
+    costPerUnit: document.getElementById('newCostPerUnit').value.trim() // '' = unknown
+  };
+
+  const result = await apiPost({ action: 'addNewInventoryItem', fields: fields, password: dashboardPassword });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  successEl.textContent = 'Added! You can now scan it normally.';
+  setTimeout(() => {
+    document.getElementById('skuInput').value = '';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('skuInput').focus();
+  }, 1400);
+}
+
+/* ========================================================================
+   INTERNAL SUPPLIES VIEW — moved from internal-inventory.html unchanged
+   except for names (internal* / loadInternalLowStock / currentInternalItem)
+   so nothing collides with the store view's functions. Calls only
+   Internal Inventory actions; never touches Products or product cost.
+   ======================================================================== */
+
+/* ---------------- Internal: found item card ---------------- */
+function internalRenderFoundItem() {
+  const p = currentInternalItem;
+  currentMode = 'add';
+  const isLow = p.quantity <= p.lowStockThreshold;
+
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card">
+      <div class="item-name">${escapeHtml(p.name)}</div>
+      <div class="item-category">${escapeHtml(p.category || '')}</div>
+      <div class="stat-row"><span class="label">Quantity on hand</span><span class="value ${isLow ? 'low' : ''}" id="currentQtyDisplay">${p.quantity}</span></div>
+      <div class="stat-row"><span class="label">Low stock threshold</span><span>${p.lowStockThreshold}</span></div>
+      <div class="stat-row"><span class="label">Reorder status</span><span>${escapeHtml(p.reorderStatus)}</span></div>
+      <div class="stat-row"><span class="label">Last updated</span><span>${escapeHtml(String(p.lastUpdated))}</span></div>
+
+      ${p.quickOrderUrl ? `<button class="link-btn" id="quickOrderBtn" style="margin-top:12px;">Quick Order</button>` : ''}
+
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="add">Add</button>
+        <button class="mode-tab" data-mode="remove">Remove</button>
+        <button class="mode-tab" data-mode="set">Set exact</button>
+      </div>
+
+      <label for="amountInput" id="amountLabel">Amount to add</label>
+      <input type="number" id="amountInput" min="0" placeholder="0">
+      <div class="preview" id="preview">New quantity will be: <strong>${p.quantity}</strong></div>
+
+      <label for="reasonSelect">Reason (required)</label>
+      <select id="reasonSelect">
+        <option value="">Select a reason...</option>
+        <option value="Restock">Restock</option>
+        <option value="Damaged item">Damaged item</option>
+        <option value="Personal use">Personal use</option>
+        <option value="Correction">Correction</option>
+        <option value="Physical count adjustment">Physical count adjustment</option>
+        <option value="Other">Other</option>
+      </select>
+      <input type="text" id="reasonOtherInput" placeholder="Describe the reason" class="hidden">
+
+      <button id="applyBtn">Apply</button>
+      <div class="error" id="applyError"></div>
+      <div class="success" id="applySuccess"></div>
+
+      <label class="section-label">Reserve &amp; back stock</label>
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;">
+          <label for="reserveStockInput">Reserve Stock</label>
+          <input type="number" id="reserveStockInput" min="0" value="${p.reserveStock || 0}">
+        </div>
+        <div style="flex:1;">
+          <label for="backStockInput">Back Stock</label>
+          <input type="number" id="backStockInput" min="0" value="${p.backStock || 0}">
+        </div>
+      </div>
+      <button class="secondary" id="saveReserveBackBtn" style="margin-top:8px;">Save reserve/back stock</button>
+      <div class="error" id="reserveBackError"></div>
+      <div class="success" id="reserveBackSuccess"></div>
+
+      <label class="section-label">Supplier &amp; reorder info</label>
+      <label for="supplierInput">Supplier</label>
+      <input type="text" id="supplierInput" value="${escapeHtml(p.supplier)}">
+      <label for="quickOrderUrlInput">Quick Order URL</label>
+      <input type="text" id="quickOrderUrlInput" value="${escapeHtml(p.quickOrderUrl)}" placeholder="https://...">
+      <label for="preferredQtyInput">Preferred Reorder Quantity</label>
+      <input type="number" id="preferredQtyInput" min="0" value="${p.preferredReorderQty || 0}">
+      <label for="reorderStatusSelect">Reorder Status</label>
+      <select id="reorderStatusSelect">
+        <option value="In stock" ${p.reorderStatus === 'In stock' ? 'selected' : ''}>In stock</option>
+        <option value="Needs order" ${p.reorderStatus === 'Needs order' ? 'selected' : ''}>Needs order</option>
+        <option value="Ordered" ${p.reorderStatus === 'Ordered' ? 'selected' : ''}>Ordered</option>
+        <option value="Received" ${p.reorderStatus === 'Received' ? 'selected' : ''}>Received</option>
+        <option value="Discontinued" ${p.reorderStatus === 'Discontinued' ? 'selected' : ''}>Discontinued</option>
+      </select>
+      <label for="notesInput">Notes</label>
+      <textarea id="notesInput" rows="2">${escapeHtml(p.notes)}</textarea>
+      <button class="secondary" id="saveSupplierBtn" style="margin-top:8px;">Save supplier info</button>
+      <div class="error" id="supplierError"></div>
+      <div class="success" id="supplierSuccess"></div>
+    </div>
+  `;
+
+  if (p.quickOrderUrl) {
+    document.getElementById('quickOrderBtn').addEventListener('click', () => {
+      // Purely opens the saved URL — never writes to the Sheet, never places
+      // an order, never touches public inventory. That's the entire action.
+      window.open(p.quickOrderUrl, '_blank', 'noopener,noreferrer');
+    });
+  }
+
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentMode = tab.dataset.mode;
+      const labelMap = { add: 'Amount to add', remove: 'Amount to remove', set: 'New exact quantity' };
+      document.getElementById('amountLabel').textContent = labelMap[currentMode];
+      internalUpdatePreview();
+    });
+  });
+
+  document.getElementById('amountInput').addEventListener('input', internalUpdatePreview);
+  document.getElementById('applyBtn').addEventListener('click', internalApplyAdjustment);
+  document.getElementById('reasonSelect').addEventListener('change', (e) => {
+    const otherInput = document.getElementById('reasonOtherInput');
+    const isOther = e.target.value === 'Other';
+    otherInput.classList.toggle('hidden', !isOther);
+    if (!isOther) otherInput.value = '';
+  });
+  document.getElementById('saveReserveBackBtn').addEventListener('click', internalSaveReserveBackStock);
+  document.getElementById('saveSupplierBtn').addEventListener('click', internalSaveSupplierInfo);
+}
+
+function internalUpdatePreview() {
+  const amt = Number(document.getElementById('amountInput').value) || 0;
+  let newQty = currentInternalItem.quantity;
+  if (currentMode === 'add') newQty = currentInternalItem.quantity + amt;
+  else if (currentMode === 'remove') newQty = Math.max(0, currentInternalItem.quantity - amt);
+  else if (currentMode === 'set') newQty = amt;
+  document.getElementById('preview').innerHTML = 'New quantity will be: <strong>' + newQty + '</strong>';
+}
+
+async function internalApplyAdjustment() {
+  const amt = document.getElementById('amountInput').value;
+  const applyError = document.getElementById('applyError');
+  const applySuccess = document.getElementById('applySuccess');
+  applyError.textContent = '';
+  applySuccess.textContent = '';
+
+  const adminName = document.getElementById('adminNameInput').value.trim();
+  const reasonSelected = document.getElementById('reasonSelect').value;
+  const reasonOther = document.getElementById('reasonOtherInput').value.trim();
+  const reason = reasonSelected === 'Other' ? reasonOther : reasonSelected;
+
+  if (amt === '' || Number(amt) < 0) {
+    applyError.textContent = 'Enter a valid amount.';
+    return;
+  }
+  if (!adminName) {
+    applyError.textContent = 'Enter your name at the top of the page first.';
+    return;
+  }
+  if (!reason) {
+    applyError.textContent = 'Select a reason (or describe one if you chose Other).';
+    return;
+  }
+
+  const result = await apiPost({
+    action: 'adjustInternalQuantity',
+    sku: currentInternalItem.sku,
+    mode: currentMode,
+    amount: amt,
+    reason: reason,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    applyError.textContent = result.error;
+    return;
+  }
+
+  applySuccess.textContent = 'Updated — new quantity: ' + result.quantity;
+  currentInternalItem.quantity = result.quantity;
+  document.getElementById('currentQtyDisplay').textContent = result.quantity;
+  document.getElementById('amountInput').value = '';
+  internalUpdatePreview();
+  loadInternalLowStock();
+
+  setTimeout(() => {
+    document.getElementById('skuInput').value = '';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('skuInput').focus();
+  }, 1400);
+}
+
+async function internalSaveReserveBackStock() {
+  const errorEl = document.getElementById('reserveBackError');
+  const successEl = document.getElementById('reserveBackSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const result = await apiPost({
+    action: 'updateInternalReserveBack',
+    sku: currentInternalItem.sku,
+    reserveStock: document.getElementById('reserveStockInput').value,
+    backStock: document.getElementById('backStockInput').value,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+  currentInternalItem.reserveStock = result.reserveStock;
+  currentInternalItem.backStock = result.backStock;
+  successEl.textContent = 'Saved.';
+}
+
+async function internalSaveSupplierInfo() {
+  const errorEl = document.getElementById('supplierError');
+  const successEl = document.getElementById('supplierSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const result = await apiPost({
+    action: 'updateInternalSupplierInfo',
+    sku: currentInternalItem.sku,
+    supplier: document.getElementById('supplierInput').value.trim(),
+    quickOrderUrl: document.getElementById('quickOrderUrlInput').value.trim(),
+    preferredReorderQty: document.getElementById('preferredQtyInput').value,
+    reorderStatus: document.getElementById('reorderStatusSelect').value,
+    notes: document.getElementById('notesInput').value.trim(),
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+  successEl.textContent = 'Saved. Re-look-up this SKU to see the Quick Order button reflect any URL change.';
+  loadInternalLowStock();
+}
+
+/* ---------------- Not found: add new internal item ---------------- */
+function internalRenderNotFound(sku) {
+  document.getElementById('resultArea').innerHTML = `
+    <div class="card">
+      <p>Internal SKU <strong>${escapeHtml(sku)}</strong> was not found.</p>
+      <p style="color:var(--text-dim); font-size:0.85rem;">Add it as a new internal item?</p>
+      <div class="btn-row">
+        <button id="addNewYesBtn">Yes, add it</button>
+        <button class="secondary" id="addNewNoBtn">No</button>
+      </div>
+      <div id="newItemFormArea"></div>
+      ${otherSystemHintHtml('store')}
+    </div>
+  `;
+  document.getElementById('addNewNoBtn').addEventListener('click', () => {
+    document.getElementById('resultArea').innerHTML = '';
+  });
+  document.getElementById('addNewYesBtn').addEventListener('click', () => internalRenderNewItemForm(sku));
+  wireOtherSystemHint('store');
+}
+
+function internalRenderNewItemForm(sku) {
+  document.getElementById('newItemFormArea').innerHTML = `
+    <label>Item Name</label>
+    <input type="text" id="newName">
+    <label>Category</label>
+    <input type="text" id="newCategory" placeholder="e.g. Packaging">
+    <label>Quantity On Hand</label>
+    <input type="number" id="newQuantity" min="0" value="0">
+    <label>Low Stock Threshold</label>
+    <input type="number" id="newThreshold" min="0" value="5">
+    <label>Reserve Stock</label>
+    <input type="number" id="newReserveStock" min="0" value="0">
+    <label>Back Stock</label>
+    <input type="number" id="newBackStock" min="0" value="0">
+    <label>Supplier</label>
+    <input type="text" id="newSupplier">
+    <label>Quick Order URL</label>
+    <input type="text" id="newQuickOrderUrl" placeholder="https://...">
+    <label>Preferred Reorder Quantity</label>
+    <input type="number" id="newPreferredQty" min="0" value="0">
+    <label>Reorder Status</label>
+    <select id="newReorderStatus">
+      <option value="In stock">In stock</option>
+      <option value="Needs order">Needs order</option>
+      <option value="Ordered">Ordered</option>
+      <option value="Received">Received</option>
+      <option value="Discontinued">Discontinued</option>
+    </select>
+    <label>Notes</label>
+    <textarea id="newNotes" rows="2"></textarea>
+    <button id="submitNewItemBtn" style="margin-top:10px;">Add Item</button>
+    <div class="error" id="newItemError"></div>
+    <div class="success" id="newItemSuccess"></div>
+  `;
+  document.getElementById('submitNewItemBtn').addEventListener('click', () => internalSubmitNewItem(sku));
+}
+
+async function internalSubmitNewItem(sku) {
+  const errorEl = document.getElementById('newItemError');
+  const successEl = document.getElementById('newItemSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  const name = document.getElementById('newName').value.trim();
+  if (!name) {
+    errorEl.textContent = 'Item name is required.';
+    return;
+  }
+
+  const fields = {
+    sku: sku,
+    name: name,
+    category: document.getElementById('newCategory').value.trim(),
+    quantity: document.getElementById('newQuantity').value,
+    lowStockThreshold: document.getElementById('newThreshold').value,
+    reserveStock: document.getElementById('newReserveStock').value,
+    backStock: document.getElementById('newBackStock').value,
+    supplier: document.getElementById('newSupplier').value.trim(),
+    quickOrderUrl: document.getElementById('newQuickOrderUrl').value.trim(),
+    preferredReorderQty: document.getElementById('newPreferredQty').value,
+    reorderStatus: document.getElementById('newReorderStatus').value,
+    notes: document.getElementById('newNotes').value.trim()
+  };
+
+  const result = await apiPost({ action: 'addInternalItem', fields: fields, password: dashboardPassword });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  successEl.textContent = 'Added! You can now scan it normally.';
+  loadInternalLowStock();
+  setTimeout(() => {
+    document.getElementById('skuInput').value = '';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('skuInput').focus();
+  }, 1400);
+}
+
+/* ---------------- Low stock list ---------------- */
+document.getElementById('refreshLowStockBtn').addEventListener('click', loadInternalLowStock);
+
+async function loadInternalLowStock() {
+  const container = document.getElementById('lowStockList');
+  const result = await apiPost({ action: 'getInternalInventoryList', password: dashboardPassword });
+  if (result.error) {
+    container.innerHTML = '<div class="empty">Could not load.</div>';
+    return;
+  }
+
+  const low = result.filter(item => item.quantity <= item.lowStockThreshold);
+  if (!low.length) {
+    container.innerHTML = '<div class="empty">Nothing low right now.</div>';
+    return;
+  }
+
+  container.innerHTML = low.map(item => `
+    <div class="low-stock-item">
+      <div class="info">
+        <span>${escapeHtml(item.name)}${item.category ? ' — ' + escapeHtml(item.category) : ''}</span>
+        <span class="qty">${item.quantity} on hand (threshold ${item.lowStockThreshold})</span>
+      </div>
+      ${item.quickOrderUrl ? `<button class="link-btn" data-url="${escapeHtml(item.quickOrderUrl)}">Quick Order</button>` : ''}
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.link-btn[data-url]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      window.open(btn.dataset.url, '_blank', 'noopener,noreferrer');
+    });
+  });
+}
+
+/* ---------------- Camera scanning ---------------- */
+document.getElementById('scanBtn').addEventListener('click', toggleScanner);
+
+function toggleScanner() {
+  const scannerEl = document.getElementById('scanner');
+  if (html5QrScanner) {
+    stopScanner();
+    return;
+  }
+  scannerEl.classList.remove('hidden');
+  html5QrScanner = new Html5Qrcode('scanner');
+  html5QrScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: 220 },
+    (decodedText) => {
+      document.getElementById('skuInput').value = decodedText.trim();
+      stopScanner();
+      doLookup();
+    },
+    () => { /* ignore per-frame scan misses */ }
+  ).catch(err => {
+    document.getElementById('lookupError').textContent = 'Could not start camera: ' + err;
+    scannerEl.classList.add('hidden');
+    html5QrScanner = null;
+  });
+}
+
+function stopScanner() {
+  if (!html5QrScanner) return;
+  html5QrScanner.stop().then(() => {
+    html5QrScanner.clear();
+    html5QrScanner = null;
+    document.getElementById('scanner').classList.add('hidden');
+  }).catch(() => {
+    html5QrScanner = null;
+    document.getElementById('scanner').classList.add('hidden');
+  });
+}
+
+/* ------------------------------------------------------------------------
+   Physical-count inventory session
+   ------------------------------------------------------------------------ */
+document.getElementById('startCountSessionBtn').addEventListener('click', async () => {
+  const adminName = document.getElementById('adminNameInput').value.trim();
+  const errorEl = document.getElementById('lookupError');
+  errorEl.textContent = '';
+
+  if (!adminName) {
+    errorEl.textContent = 'Enter your name before starting a count session.';
+    return;
+  }
+
+  const result = await apiPost({ action: 'startCountSession', admin: adminName, password: dashboardPassword });
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  countSession = { sessionId: result.sessionId, counted: 0, diffs: 0, net: 0 };
+  saveCountSessionToStorage();
+  updateCountSessionBanner();
+  document.getElementById('countSessionBanner').classList.remove('hidden');
+  document.getElementById('startCountSessionBtn').classList.add('hidden');
+  document.getElementById('resultArea').innerHTML = '';
+  document.getElementById('skuInput').value = '';
+  document.getElementById('skuInput').focus();
+});
+
+document.getElementById('endCountSessionBtn').addEventListener('click', async () => {
+  if (!countSession) return;
+  const result = await apiPost({ action: 'endCountSession', sessionId: countSession.sessionId, password: dashboardPassword });
+  if (result.error) {
+    document.getElementById('lookupError').textContent = result.error;
+    return;
+  }
+
+  localStorage.removeItem('kfq_active_count_session');
+  document.getElementById('countSessionBanner').classList.add('hidden');
+  document.getElementById('startCountSessionBtn').classList.remove('hidden');
+  document.getElementById('resultArea').innerHTML = `
+    <div class="summary-panel">
+      <h2 style="font-size:1.1rem;">Count session complete</h2>
+      <p style="color:var(--text-dim); font-size:0.85rem;">${result.sessionId}</p>
+      <div class="stat-row"><span class="label">Products counted</span><span>${result.productsCounted}</span></div>
+      <div class="stat-row"><span class="label">Differences found</span><span>${result.differencesFound}</span></div>
+      <div class="stat-row"><span class="label">Net units adjusted</span><span>${result.netUnitsAdjusted}</span></div>
+    </div>
+  `;
+  countSession = null;
+});
+
+function updateCountSessionBanner() {
+  if (!countSession) return;
+  document.getElementById('countSessionCounted').textContent = countSession.counted;
+  document.getElementById('countSessionDiffs').textContent = countSession.diffs;
+  document.getElementById('countSessionNet').textContent = (countSession.net > 0 ? '+' : '') + countSession.net;
+}
+
+function renderCountCard() {
+  const p = currentCountItem;
+  const subLabel = currentCountItemType === 'backstock' ? (p.category || '') : (p.flavor || '');
+  const typeBadge = currentCountItemType === 'backstock' ? 'Internal supply' : 'Store product';
+  document.getElementById('resultArea').innerHTML = `
+    <div class="count-card">
+      <div class="stat-row" style="border-bottom:none; padding-bottom:0;"><span class="label"></span><span class="count-type-badge">${typeBadge}</span></div>
+      <div class="product-name">${escapeHtml(p.name)}</div>
+      <div class="product-flavor">${escapeHtml(subLabel)}</div>
+      <div class="stat-row"><span class="label">Sheet quantity</span><span>${p.quantity}</span></div>
+
+      <label for="physicalCountInput">Physical count</label>
+      <input type="number" id="physicalCountInput" min="0" placeholder="Enter what you actually counted">
+      <div class="count-diff zero" id="countDiffPreview">Difference: 0</div>
+
+      <button id="recordCountBtn">Record Count</button>
+      <div class="error" id="countError"></div>
+      <div class="success" id="countSuccess"></div>
+    </div>
+  `;
+
+  const input = document.getElementById('physicalCountInput');
+  input.addEventListener('input', () => {
+    const physical = Number(input.value);
+    const diff = (input.value === '') ? 0 : physical - p.quantity;
+    const diffEl = document.getElementById('countDiffPreview');
+    diffEl.textContent = 'Difference: ' + (diff > 0 ? '+' : '') + diff;
+    diffEl.className = 'count-diff ' + (diff === 0 ? 'zero' : diff > 0 ? 'positive' : 'negative');
+  });
+  input.focus();
+
+  document.getElementById('recordCountBtn').addEventListener('click', submitCount);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submitCount(); });
+}
+
+async function submitCount() {
+  const physicalCount = document.getElementById('physicalCountInput').value;
+  const errorEl = document.getElementById('countError');
+  const successEl = document.getElementById('countSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+
+  if (physicalCount === '' || Number(physicalCount) < 0) {
+    errorEl.textContent = 'Enter a valid count.';
+    return;
+  }
+
+  const adminName = document.getElementById('adminNameInput').value.trim();
+
+  const result = await apiPost({
+    action: 'recordCount',
+    sessionId: countSession.sessionId,
+    inventoryType: currentCountItemType,
+    sku: currentCountItem.sku,
+    physicalCount: physicalCount,
+    admin: adminName,
+    password: dashboardPassword
+  });
+
+  if (result.error) {
+    errorEl.textContent = result.error;
+    return;
+  }
+
+  countSession.counted++;
+  if (result.adjusted) countSession.diffs++;
+  countSession.net += result.difference;
+  saveCountSessionToStorage();
+  updateCountSessionBanner();
+
+  successEl.textContent = result.adjusted
+    ? 'Recorded — adjusted by ' + (result.difference > 0 ? '+' : '') + result.difference
+    : 'Recorded — matched, no adjustment needed';
+
+  setTimeout(() => {
+    document.getElementById('skuInput').value = '';
+    document.getElementById('resultArea').innerHTML = '';
+    document.getElementById('skuInput').focus();
+    if (inventoryView === 'internal') loadInternalLowStock();
+  }, 1100);
+}
+</script>
+</body>
+</html>
