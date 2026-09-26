@@ -463,7 +463,7 @@
           <input type="checkbox" id="valuationIncludeArchived"> Include archived
         </label>
       </div>
-      <p class="valuation-sub">Private. Uses list prices as set in Products, before any discounts. Set costs in the Inventory Scan page.</p>
+      <p class="valuation-sub">Private. Uses list prices as set in Products, before any discounts. Set costs on the Inventory page (Store products).</p>
       <div class="stats-row">
         <div class="stat-card">
           <div class="label">Total units on hand</div>
@@ -494,13 +494,13 @@
           <tbody id="valuationTableBody"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
         </table>
       </div>
-      <a class="nav-link" href="./inventory.html" style="display:inline-block; margin-top:8px; color:var(--accent); font-size:0.82rem;">Open Inventory Scan to set costs →</a>
+      <a class="nav-link" href="./inventory.html?mode=store" style="display:inline-block; margin-top:8px; color:var(--accent); font-size:0.82rem;">Open Inventory to set costs →</a>
     </div>
 
     <div class="section">
       <div class="section-head"><h2 style="font-size:1.05rem;">Internal inventory — low stock</h2></div>
       <div id="internalLowStockList"></div>
-      <a class="nav-link" href="./internal-inventory.html" style="display:inline-block; margin-top:8px; color:var(--accent); font-size:0.82rem;">Open Internal Inventory →</a>
+      <a class="nav-link" href="./inventory.html?mode=internal" style="display:inline-block; margin-top:8px; color:var(--accent); font-size:0.82rem;">Open Internal supplies →</a>
     </div>
 
     <div class="section">
@@ -837,7 +837,7 @@ function renderDashboard(data, isSourceOfTruth) {
     `).join('');
     internalLowStockList.querySelectorAll('.quick-order-btn[data-url]').forEach(btn => {
       btn.addEventListener('click', () => {
-        // Same as internal-inventory.html — opens the saved URL only, no
+        // Same as the Internal supplies view in inventory.html — opens the saved URL only, no
         // Sheet write, no API call. Pure link-open action.
         window.open(btn.dataset.url, '_blank', 'noopener,noreferrer');
       });
@@ -1241,7 +1241,7 @@ function renderInventoryValuation(v) {
 
   const notes = [];
   if (!v.costedSkuCount && v.skuCount) {
-    notes.push(`<div class="valuation-note">No products have a cost yet, so cost and margin can't be estimated. Set costs in Inventory Scan.</div>`);
+    notes.push(`<div class="valuation-note">No products have a cost yet, so cost and margin can't be estimated. Set costs on the Inventory page.</div>`);
   } else if (v.isPartial) {
     notes.push(`<div class="valuation-note"><strong>Missing cost:</strong> ${v.missingCost.skuCount} product${v.missingCost.skuCount === 1 ? '' : 's'} with stock (${Number(v.missingCost.units).toLocaleString()} units, ${money(v.missingCost.salesValue)} sales value) ${v.missingCost.skuCount === 1 ? 'has' : 'have'} no cost set. ${v.missingCost.skuCount === 1 ? 'It is' : 'They are'} counted in units and sales value, but left out of cost and margin. Margin is calculated only over the ${money(v.costedSalesValue)} of stock that has a cost.</div>`);
   }
