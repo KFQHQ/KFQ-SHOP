@@ -235,6 +235,54 @@ textarea {
   .count-type-badge { color: var(--accent); font-size: 0.75rem; font-weight: 700; }
   .other-system-hint { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 0.85rem; color: var(--text-dim); }
   .other-system-hint button { margin-top: 8px; }
+
+  /* Search by SKU, strain/product type, or item name/category */
+  .search-results {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 10px;
+    overflow: hidden;
+  }
+  .search-results-head { padding: 10px 14px; font-size: 0.8rem; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+  .search-result {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: transparent;
+    color: var(--text);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 11px 14px;
+    text-align: left;
+    font-weight: 400;
+    font-size: 0.9rem;
+  }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover, .search-result:focus-visible { background: var(--surface-raised); outline: none; }
+  .search-result .sr-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .search-result .sr-title { font-weight: 700; }
+  .search-result .sr-sub { color: var(--text-dim); font-size: 0.8rem; }
+  .search-result .sr-qty { color: var(--text-dim); font-size: 0.8rem; white-space: nowrap; text-align: right; }
+  .sr-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    vertical-align: middle;
+  }
+  .sr-tag.system { color: var(--accent); border-color: var(--accent); }
+  .search-result .sr-match { color: var(--accent); }
+  .search-results-foot { padding: 10px 14px; font-size: 0.8rem; color: var(--text-dim); }
+  .search-results-foot button { margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -278,6 +326,7 @@ textarea {
     </div>
     <div id="scanner" class="hidden"></div>
     <div class="error" id="lookupError"></div>
+    <div id="searchResults" class="search-results hidden" role="list" aria-label="Matching items"></div>
 
     <div id="resultArea"></div>
 
@@ -314,13 +363,13 @@ let lookupSeq = 0;               // drops late lookup responses after a view swi
 const VIEW_COPY = {
   store: {
     subtitle: 'Store products customers can buy. Scan or type a SKU to look it up.',
-    skuLabel: 'SKU',
-    placeholder: 'e.g. TERPBLAST-KFQ'
+    skuLabel: 'SKU, strain, or product type',
+    placeholder: 'e.g. TERPBLAST-KFQ or Blue Dream'
   },
   internal: {
     subtitle: 'Internal supplies and back-stock. Never sold, never shown on the storefront.',
-    skuLabel: 'Internal SKU',
-    placeholder: 'e.g. SUPPLY-001'
+    skuLabel: 'Internal SKU, item name, or category',
+    placeholder: 'e.g. SUPPLY-001 or bags'
   }
 };
 
@@ -358,6 +407,7 @@ function setView(view, options) {
     currentInternalItem = null;
   }
   if (inventoryView === 'internal' && dashboardPassword) loadInternalLowStock();
+  if (dashboardPassword) refreshSuggestions();
 }
 
 document.querySelectorAll('.view-toggle button').forEach(btn => {
@@ -415,6 +465,8 @@ async function unlock() {
 
   restoreCountSessionFromStorage();
   setView(getInitialView());
+  loadSearchList('store');
+  loadSearchList('backstock');
 
   document.getElementById('skuInput').focus();
 }
@@ -470,6 +522,7 @@ async function doLookup() {
   const errorEl = document.getElementById('lookupError');
   errorEl.textContent = '';
   document.getElementById('resultArea').innerHTML = '';
+  hideSearchResults();
   if (!sku) return;
 
   const seq = ++lookupSeq;
@@ -509,9 +562,275 @@ async function doLookup() {
     }
   }
 
+  // No exact SKU. Look for strain / product type (store) or item name /
+  // category (internal) matches before offering to add a new SKU.
+  let matches = searchEntries(sku);
+  if (!matches.length) {
+    await Promise.all(searchScopeTypes().map(t => loadSearchList(t, true)));
+    if (seq !== lookupSeq) return;
+    matches = searchEntries(sku);
+  }
+  if (matches.length) {
+    renderSearchResults(sku, matches, { fromLookup: true });
+    return;
+  }
+
   if (view === 'store') renderNotFound(sku);
   else internalRenderNotFound(sku);
 }
+
+/* ---------------- Search ----------------
+   Store view searches every Products column except Image URL and the
+   private Cost Per Unit, via the owner-only getProductsForInventorySearch
+   action (columns added after N are included automatically). Internal
+   view searches SKU + Item Name + Category via getInternalInventoryList.
+   Entries are built from an explicit field list. The list is only used to
+   FIND an item — opening a result always re-fetches it by SKU, so the card
+   never shows stale numbers. */
+const searchCache = { store: null, backstock: null };
+const searchStale = { store: false, backstock: false };
+const searchLoading = { store: null, backstock: null };
+let suggestTimer = null;
+
+function loadSearchList(type, force) {
+  if (!force && searchCache[type] && !searchStale[type]) return Promise.resolve(searchCache[type]);
+  if (searchLoading[type]) return searchLoading[type];
+  const body = type === 'store'
+    ? { action: 'getProductsForInventorySearch', password: dashboardPassword }
+    : { action: 'getInternalInventoryList', password: dashboardPassword };
+  searchLoading[type] = apiPost(body).then(result => {
+    searchLoading[type] = null;
+    if (!Array.isArray(result)) return searchCache[type] || [];
+    searchCache[type] = result.map(r => type === 'store' ? buildStoreSearchEntry(r) : {
+      type: 'backstock', sku: String(r.sku), title: String(r.name || ''), subtitle: String(r.category || ''),
+      quantity: r.quantity, archived: false, active: true, secret: false, fields: [], statusWords: []
+    });
+    searchStale[type] = false;
+    return searchCache[type];
+  }).catch(() => {
+    searchLoading[type] = null;
+    return searchCache[type] || [];
+  });
+  return searchLoading[type];
+}
+
+/**
+ * One store product -> search entry. `fields` holds the secondary columns
+ * (labeled, so a result can say where it matched). Status is matched by
+ * word prefix, not substring, so "active" doesn't also match "inactive".
+ */
+function buildStoreSearchEntry(r) {
+  const price = Number(r.price);
+  const fields = [];
+  const add = (label, value, display) => {
+    const text = String(value === null || value === undefined ? '' : value).trim();
+    if (text) fields.push({ label: label, text: text, display: display || text });
+  };
+  if (isFinite(price)) add('Price', price + ' ' + price.toFixed(2) + ' $' + price.toFixed(2), '$' + price.toFixed(2));
+  add('Quantity', r.quantity);
+  add('Low stock threshold', r.lowStockThreshold);
+  add('Current batch', r.currentBatchId);
+  add('Archive date', r.archiveDate);
+  add('Archive reason', r.archiveReason);
+  (Array.isArray(r.extra) ? r.extra : []).forEach(x => add(String(x.label), x.value));
+
+  const statusWords = [r.active ? 'active' : 'inactive'];
+  if (r.secret) statusWords.push('secret');
+  if (r.archived) statusWords.push('archived');
+
+  return {
+    type: 'store', sku: String(r.sku), title: String(r.name || ''), subtitle: String(r.flavor || ''),
+    quantity: r.quantity, archived: !!r.archived, active: !!r.active, secret: !!r.secret,
+    fields: fields, statusWords: statusWords
+  };
+}
+
+/** Mark a list as out of date (quantity changed / item added). */
+function markSearchStale(type) {
+  searchStale[type] = true;
+}
+
+/** Outside a count session: the current view only. During one: both systems. */
+function searchScopeTypes() {
+  if (countSession) return inventoryView === 'store' ? ['store', 'backstock'] : ['backstock', 'store'];
+  return [inventoryView === 'store' ? 'store' : 'backstock'];
+}
+
+function searchTokens(query) {
+  return String(query).toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/** Does one token match this entry anywhere? Returns where, or null. */
+function tokenMatch(e, token) {
+  const primary = (e.sku + ' ' + e.title + ' ' + e.subtitle).toLowerCase();
+  if (primary.includes(token)) return { primary: true };
+  for (const f of e.fields) {
+    if (f.text.toLowerCase().includes(token)) return { field: f };
+  }
+  if (e.statusWords.some(w => w.startsWith(token))) return { status: true };
+  return null;
+}
+
+function searchEntries(query) {
+  const tokens = searchTokens(query);
+  if (!tokens.length) return [];
+  const q = tokens.join(' ');
+  const out = [];
+  searchScopeTypes().forEach((type, typeRank) => {
+    (searchCache[type] || []).forEach(e => {
+      const hits = tokens.map(t => tokenMatch(e, t));
+      if (hits.some(h => !h)) return;
+      const sku = e.sku.toLowerCase();
+      const title = e.title.toLowerCase();
+      let rank = 6;
+      if (sku === q) rank = 0;
+      else if (sku.startsWith(q)) rank = 1;
+      else if (title.startsWith(q)) rank = 2;
+      else if (e.subtitle.toLowerCase().startsWith(q)) rank = 3;
+      else if (hits.every(h => h.primary)) rank = 4;
+      else if (hits.some(h => h.primary)) rank = 5;
+      const fieldHit = hits.find(h => h.field);
+      out.push({
+        entry: e, rank: rank, typeRank: typeRank,
+        matchedField: fieldHit ? fieldHit.field : null
+      });
+    });
+  });
+  out.sort((a, b) =>
+    a.typeRank - b.typeRank ||
+    a.rank - b.rank ||
+    Number(a.entry.archived) - Number(b.entry.archived) ||
+    a.entry.title.localeCompare(b.entry.title) ||
+    a.entry.subtitle.localeCompare(b.entry.subtitle));
+  return out.map(x => Object.assign({}, x.entry, { matchedField: x.matchedField }));
+}
+
+/** True if the typed text is exactly a SKU in any searched system. */
+function isExactSkuInScope(query) {
+  const q = String(query).trim().toLowerCase();
+  if (!q) return false;
+  return searchScopeTypes().some(t => (searchCache[t] || []).some(e => e.sku.toLowerCase() === q));
+}
+
+function hideSearchResults() {
+  const box = document.getElementById('searchResults');
+  box.classList.add('hidden');
+  box.innerHTML = '';
+}
+
+const SEARCH_LIMIT = 20;
+
+function renderSearchResults(query, matches, options) {
+  options = options || {};
+  const box = document.getElementById('searchResults');
+  const shown = matches.slice(0, SEARCH_LIMIT);
+  const bothSystems = searchScopeTypes().length > 1;
+  const head = !matches.length
+    ? `No matches for “${escapeHtml(query)}”.`
+    : options.fromLookup
+      ? `No SKU matches “${escapeHtml(query)}”. Matching items:`
+      : `${matches.length} match${matches.length === 1 ? '' : 'es'}`;
+  const offerAdd = !isExactSkuInScope(query);
+
+  box.innerHTML = `
+    <div class="search-results-head">${head}</div>
+    ${shown.map((e, i) => {
+      const tags = [];
+      if (bothSystems) tags.push(`<span class="sr-tag system">${e.type === 'store' ? 'Store' : 'Internal'}</span>`);
+      if (e.archived) tags.push('<span class="sr-tag">Archived</span>');
+      else if (e.type === 'store' && !e.active) tags.push('<span class="sr-tag">Inactive</span>');
+      if (e.secret) tags.push('<span class="sr-tag">Secret</span>');
+      return `
+        <button type="button" class="search-result" role="listitem" data-index="${i}">
+          <span class="sr-main">
+            <span class="sr-title">${escapeHtml(e.title) || escapeHtml(e.sku)}${tags.join('')}</span>
+            <span class="sr-sub">${e.subtitle ? escapeHtml(e.subtitle) + ' · ' : ''}${escapeHtml(e.sku)}</span>
+            ${e.matchedField ? `<span class="sr-sub sr-match">${escapeHtml(e.matchedField.label)}: ${escapeHtml(e.matchedField.display.length > 60 ? e.matchedField.display.slice(0, 57) + '…' : e.matchedField.display)}</span>` : ''}
+          </span>
+          <span class="sr-qty">${escapeHtml(String(e.quantity))} on hand</span>
+        </button>`;
+    }).join('')}
+    ${matches.length > SEARCH_LIMIT ? `<div class="search-results-foot">+${matches.length - SEARCH_LIMIT} more — keep typing to narrow it down.</div>` : ''}
+    ${offerAdd ? `
+      <div class="search-results-foot">
+        ${matches.length ? 'Not listed?' : ''}
+        <button type="button" class="secondary" id="addTypedAsSkuBtn">Add “${escapeHtml(query)}” as a new SKU</button>
+      </div>` : ''}
+  `;
+  box.classList.remove('hidden');
+
+  box.querySelectorAll('.search-result').forEach(btn => {
+    btn.addEventListener('click', () => openSearchResult(shown[Number(btn.dataset.index)]));
+  });
+  const addBtn = document.getElementById('addTypedAsSkuBtn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      hideSearchResults();
+      if (inventoryView === 'store') renderNotFound(query);
+      else internalRenderNotFound(query);
+    });
+  }
+}
+
+/** Opens a search result by re-fetching it by SKU from its own system. */
+async function openSearchResult(entry) {
+  const errorEl = document.getElementById('lookupError');
+  errorEl.textContent = '';
+  hideSearchResults();
+  document.getElementById('skuInput').value = entry.sku;
+  document.getElementById('resultArea').innerHTML = '';
+
+  const seq = ++lookupSeq;
+  let hit;
+  try {
+    hit = await lookupInSystem(entry.type === 'store' ? 'store' : 'internal', entry.sku);
+  } catch (err) {
+    if (seq !== lookupSeq) return;
+    errorEl.textContent = err.message;
+    return;
+  }
+  if (seq !== lookupSeq) return;
+  if (!hit) {
+    errorEl.textContent = 'That item no longer exists. Refreshing the list.';
+    markSearchStale(entry.type);
+    return;
+  }
+  showLookupHit(hit);
+}
+
+/** Live suggestions as the owner types (2+ characters). */
+async function refreshSuggestions() {
+  const input = document.getElementById('skuInput');
+  const query = input.value.trim();
+  if (query.length < 2) {
+    hideSearchResults();
+    return;
+  }
+  const types = searchScopeTypes();
+  const needsLoad = types.some(t => !searchCache[t] || searchStale[t]);
+  if (needsLoad) {
+    await Promise.all(types.map(t => loadSearchList(t)));
+    if (input.value.trim() !== query) return; // owner kept typing
+  }
+  const matches = searchEntries(query);
+  // An exact SKU with nothing else matching is left to Enter / Look Up;
+  // a one-row list would just be noise.
+  if (matches.length === 1 && matches[0].sku.toLowerCase() === query.toLowerCase()) {
+    hideSearchResults();
+    return;
+  }
+  // Otherwise always show the panel — even with zero matches — so the
+  // "Add as a new SKU" option is always there for a non-exact entry.
+  renderSearchResults(query, matches);
+}
+
+document.getElementById('skuInput').addEventListener('input', () => {
+  clearTimeout(suggestTimer);
+  suggestTimer = setTimeout(refreshSuggestions, 150);
+});
+document.getElementById('skuInput').addEventListener('keydown', e => {
+  if (e.key === 'Escape') hideSearchResults();
+});
 
 function showLookupHit(hit) {
   currentCountItemType = hit.type;
@@ -792,6 +1111,7 @@ async function toggleActiveStatus() {
   }
 
   currentProduct.active = newActive;
+  markSearchStale('store');
   document.getElementById('activeStatusText').textContent = newActive ? 'Active' : 'Inactive';
   const btn = document.getElementById('toggleActiveBtn');
   btn.textContent = newActive ? 'Deactivate' : 'Activate';
@@ -822,6 +1142,7 @@ async function doArchive() {
     return;
   }
 
+  markSearchStale('store');
   currentProduct.archived = true;
   currentProduct.archiveDate = result.archiveDate;
   currentProduct.archiveReason = reason;
@@ -844,6 +1165,7 @@ async function doUnarchive() {
     return;
   }
 
+  markSearchStale('store');
   currentProduct.archived = false;
   currentProduct.archiveDate = '';
   currentProduct.archiveReason = '';
@@ -930,6 +1252,7 @@ async function applyAdjustment() {
   }
 
   applySuccess.textContent = 'Updated — new quantity: ' + result.quantity;
+  markSearchStale('store');
   currentProduct.quantity = result.quantity;
   document.getElementById('currentQtyDisplay').textContent = result.quantity;
   document.getElementById('amountInput').value = '';
@@ -970,9 +1293,9 @@ function renderNotFound(sku) {
 function renderNewItemForm(sku) {
   document.getElementById('newItemFormArea').innerHTML = `
     <div class="new-item-form">
-      <label>Product Name</label>
+      <label>Product/Strain</label>
       <input type="text" id="newName">
-      <label>Flavor</label>
+      <label>Product Type</label>
       <input type="text" id="newFlavor">
       <label>Price</label>
       <input type="number" id="newPrice" min="0" step="0.01">
@@ -1008,7 +1331,7 @@ async function submitNewItem(sku) {
 
   const name = document.getElementById('newName').value.trim();
   if (!name) {
-    errorEl.textContent = 'Product name is required.';
+    errorEl.textContent = 'Product/Strain is required.';
     return;
   }
 
@@ -1031,7 +1354,8 @@ async function submitNewItem(sku) {
     return;
   }
 
-  successEl.textContent = 'Added! You can now scan it normally.';
+  successEl.textContent = 'Added! You can now scan or search for it.';
+  loadSearchList('store', true);
   setTimeout(() => {
     document.getElementById('skuInput').value = '';
     document.getElementById('resultArea').innerHTML = '';
@@ -1208,6 +1532,7 @@ async function internalApplyAdjustment() {
   }
 
   applySuccess.textContent = 'Updated — new quantity: ' + result.quantity;
+  markSearchStale('backstock');
   currentInternalItem.quantity = result.quantity;
   document.getElementById('currentQtyDisplay').textContent = result.quantity;
   document.getElementById('amountInput').value = '';
@@ -1360,7 +1685,8 @@ async function internalSubmitNewItem(sku) {
     return;
   }
 
-  successEl.textContent = 'Added! You can now scan it normally.';
+  successEl.textContent = 'Added! You can now scan or search for it.';
+  loadSearchList('backstock', true);
   loadInternalLowStock();
   setTimeout(() => {
     document.getElementById('skuInput').value = '';
@@ -1566,7 +1892,7 @@ async function submitCount() {
   }
 
   countSession.counted++;
-  if (result.adjusted) countSession.diffs++;
+  if (result.adjusted) { countSession.diffs++; markSearchStale(currentCountItemType); }
   countSession.net += result.difference;
   saveCountSessionToStorage();
   updateCountSessionBanner();
