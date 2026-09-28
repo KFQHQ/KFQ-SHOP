@@ -456,6 +456,56 @@
     white-space: nowrap;
   }
 
+  /* ---------------- Promo codes tab ---------------- */
+  #tab-promos h1 { font-size: 1.4rem; }
+  #tab-promos .promo-sub { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 16px; }
+  #tab-promos .promo-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  #tab-promos h2 { font-size: 1.05rem; margin-bottom: 10px; }
+  #tab-promos label { display: block; color: var(--text-dim); font-size: 0.8rem; margin: 14px 0 6px; }
+  #tab-promos .promo-filters label { display: inline-flex; align-items: center; gap: 6px; margin: 10px 16px 6px 0; font-size: 0.82rem; }
+  #tab-promos input[type="text"], #tab-promos input[type="number"] {
+    width: 100%; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; color: var(--text); font-size: 0.95rem; font-family: inherit;
+  }
+  #tab-promos input[type="checkbox"] { width: auto; margin: 0; accent-color: var(--accent); }
+  #tab-promos input:focus-visible, #tab-promos button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #tab-promos .promo-row { display: flex; gap: 8px; }
+  #tab-promos .promo-row input { flex: 1; min-width: 0; text-transform: uppercase; }
+  #tab-promos button { font-family: inherit; cursor: pointer; }
+  #tab-promos button:disabled { opacity: 0.45; cursor: not-allowed; }
+  #tab-promos .promo-ghost { background: var(--surface-raised); color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px; font-size: 0.85rem; white-space: nowrap; }
+  #tab-promos .promo-primary { width: 100%; background: var(--accent); color: #0A2320; border: none; border-radius: 999px; padding: 12px; font-weight: 700; font-size: 0.95rem; margin-top: 14px; }
+  #tab-promos .promo-seg { display: flex; gap: 4px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 999px; padding: 4px; }
+  #tab-promos .promo-seg button { flex: 1; background: transparent; color: var(--text-dim); border: none; border-radius: 999px; padding: 9px 10px; font-size: 0.85rem; }
+  #tab-promos .promo-seg button[aria-pressed="true"] { background: var(--accent); color: #0A2320; font-weight: 700; }
+  #tab-promos #promoItemsBox { margin-top: 10px; }
+  #tab-promos .promo-pick-list { margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  #tab-promos .promo-pick-list:empty { display: none; }
+  #tab-promos .promo-pick { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: transparent; color: var(--text); border: none; border-bottom: 1px solid var(--border); padding: 9px 12px; font-size: 0.88rem; }
+  #tab-promos .promo-pick:last-child { border-bottom: none; }
+  #tab-promos .promo-pick:hover { background: var(--surface-raised); }
+  #tab-promos .promo-pick .meta, #tab-promos .promo-dim { color: var(--text-dim); font-size: 0.78rem; }
+  #tab-promos .promo-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  #tab-promos .promo-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-raised); border: 1px solid var(--accent); color: var(--text); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 0.82rem; }
+  #tab-promos .promo-chip button { background: transparent; border: none; color: var(--text-dim); font-size: 1rem; line-height: 1; padding: 2px 6px; }
+  #tab-promos .promo-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; border: 1px solid var(--border); color: var(--text-dim); }
+  #tab-promos .promo-preview { margin-top: 16px; padding: 12px 14px; border-radius: 10px; background: var(--surface-raised); border: 1px solid var(--border); font-size: 0.88rem; }
+  #tab-promos .promo-preview:empty { display: none; }
+  #tab-promos .promo-success { color: var(--accent); font-size: 0.88rem; margin-top: 10px; }
+  #tab-promos .promo-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  #tab-promos .promo-head h2 { margin: 0; }
+  #tab-promos .promo-item { border-top: 1px solid var(--border); padding: 12px 0; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+  #tab-promos .promo-item:first-child { border-top: none; }
+  #tab-promos .promo-code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-weight: 700; letter-spacing: 0.02em; }
+  #tab-promos .promo-desc { font-size: 0.88rem; margin-top: 3px; }
+  #tab-promos .promo-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  #tab-promos .promo-actions button { padding: 6px 12px; font-size: 0.78rem; }
+  #tab-promos .promo-status { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; vertical-align: middle; }
+  #tab-promos .promo-status.active { background: rgba(63,217,199,0.14); color: var(--accent); }
+  #tab-promos .promo-status.used { background: var(--surface-raised); color: var(--text-dim); }
+  #tab-promos .promo-status.off { background: rgba(232,150,60,0.14); color: var(--warm); }
+  #tab-promos .empty { color: var(--text-dim); font-size: 0.85rem; padding: 10px 0; }
+
   /* ---------------- Inventory tab (scoped; from inventory.html) ---------------- */
   #tab-inventory h1,
   #tab-inventory h2 { margin: 0 0 4px; }
@@ -596,6 +646,7 @@
       <button type="button" role="tab" id="tabBtn-overview" data-tab="overview" aria-controls="tab-overview" aria-selected="true">Overview</button>
       <button type="button" role="tab" id="tabBtn-inventory" data-tab="inventory" aria-controls="tab-inventory" aria-selected="false">Inventory<span class="tab-dot" id="countSessionDot" hidden title="Count session in progress"></span></button>
       <button type="button" role="tab" id="tabBtn-batches" data-tab="batches" aria-controls="tab-batches" aria-selected="false">Batches</button>
+      <button type="button" role="tab" id="tabBtn-promos" data-tab="promos" aria-controls="tab-promos" aria-selected="false">Promo codes</button>
       <button type="button" class="lock-btn" id="lockBtn" title="Lock the dashboard now on this device">Lock</button>
     </nav>
 
@@ -775,6 +826,69 @@
       <button class="secondary" id="refreshLowStockBtn" style="margin-top:10px;">Refresh</button>
     </div>
   
+      </div>
+    </section>
+
+    <section id="tab-promos" role="tabpanel" aria-labelledby="tabBtn-promos" hidden>
+      <div class="module-wrap">
+        <h1>Promo codes</h1>
+        <p class="promo-sub">Customers enter these at checkout. A use is counted when you confirm the order.</p>
+
+        <div class="promo-card">
+          <h2>New code</h2>
+
+          <label for="promoCodeInput">Code</label>
+          <div class="promo-row">
+            <input type="text" id="promoCodeInput" placeholder="e.g. CHARGER10" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            <button type="button" class="promo-ghost" id="promoGenerateBtn">Generate</button>
+          </div>
+
+          <label>Applies to</label>
+          <div class="promo-seg" id="promoScopeSeg" role="group" aria-label="Applies to">
+            <button type="button" data-scope="order" aria-pressed="true">Whole order</button>
+            <button type="button" data-scope="items" aria-pressed="false">Specific item(s)</button>
+          </div>
+          <div id="promoItemsBox" hidden>
+            <input type="text" id="promoItemSearch" placeholder="Search products by name, strain, type, or SKU" autocomplete="off">
+            <div id="promoItemResults" class="promo-pick-list"></div>
+            <div id="promoChosen" class="promo-chips"></div>
+          </div>
+
+          <label>Discount</label>
+          <div class="promo-seg" id="promoTypeSeg" role="group" aria-label="Discount type">
+            <button type="button" data-type="Fixed" aria-pressed="true">$ off</button>
+            <button type="button" data-type="Percent" aria-pressed="false">% off</button>
+            <button type="button" data-type="Free" aria-pressed="false" disabled title="Pick specific items first">Free item</button>
+          </div>
+          <div id="promoValueRow">
+            <label for="promoValueInput" id="promoValueLabel">Amount off ($)</label>
+            <input type="number" id="promoValueInput" min="0" step="0.01" placeholder="10">
+          </div>
+
+          <label for="promoUsesInput">How many times it can be used</label>
+          <input type="number" id="promoUsesInput" min="1" step="1" value="1">
+
+          <label for="promoNotesInput">Notes (optional — only you see these)</label>
+          <input type="text" id="promoNotesInput" maxlength="300">
+
+          <div class="promo-preview" id="promoPreview" aria-live="polite"></div>
+          <button type="button" class="promo-primary" id="promoCreateBtn">Create code</button>
+          <div class="error" id="promoCreateError"></div>
+          <div class="promo-success" id="promoCreateSuccess"></div>
+        </div>
+
+        <div class="promo-card">
+          <div class="promo-head">
+            <h2>Your codes</h2>
+            <button type="button" class="promo-ghost" id="promoRefreshBtn">Refresh</button>
+          </div>
+          <input type="text" id="promoListSearch" placeholder="Search codes, items, notes" autocomplete="off">
+          <div class="promo-filters">
+            <label><input type="checkbox" id="promoActiveOnly" checked> Active only</label>
+            <label><input type="checkbox" id="promoShowLoyalty"> Show loyalty codes</label>
+          </div>
+          <div id="promoList"><div class="empty">Loading…</div></div>
+        </div>
       </div>
     </section>
 
@@ -1202,6 +1316,7 @@ function parseHash() {
     return { tab: 'inventory', view: parts[1] === 'internal' ? 'internal' : (parts[1] === 'store' ? 'store' : null) };
   }
   if (parts[0] === 'batches') return { tab: 'batches' };
+  if (parts[0] === 'promos') return { tab: 'promos' };
   return { tab: 'overview' };
 }
 
@@ -1216,9 +1331,10 @@ function showTab(tab, options) {
   if (previous !== tab) {
     if (previous === 'inventory') window.KFQInventory.hide();
     if (previous === 'batches') window.KFQBatches.hide();
+    if (previous === 'promos') window.KFQPromos.hide();
   }
   activeTab = tab;
-  ['overview', 'inventory', 'batches'].forEach(name => {
+  ['overview', 'inventory', 'batches', 'promos'].forEach(name => {
     document.getElementById('tab-' + name).hidden = name !== tab;
     document.getElementById('tabBtn-' + name).setAttribute('aria-selected', String(name === tab));
   });
@@ -1235,6 +1351,9 @@ function showTab(tab, options) {
   } else if (tab === 'batches') {
     history.replaceState(null, '', '#batches');
     window.KFQBatches.show();
+  } else if (tab === 'promos') {
+    history.replaceState(null, '', '#promos');
+    window.KFQPromos.show();
   }
   updateCountSessionDot();
 }
@@ -1243,6 +1362,7 @@ function notifyDataChanged(action) {
   if (activeTab !== 'overview') overviewStale = true;
   window.KFQInventory.dataChanged();
   window.KFQBatches.dataChanged();
+  window.KFQPromos.dataChanged();
   updateCountSessionDot();
 }
 
@@ -3774,6 +3894,294 @@ window.KFQBatches = {
   }
 };
 
+})();
+</script>
+
+
+<script>
+/* ========================================================================
+   PROMO CODES TAB — create and manage Discount Codes rows. Owner-only
+   actions: getDiscountCodes, createDiscountCode, setDiscountCodeActive
+   (all password/session gated on the server, which re-validates every
+   field). Product picker uses getAllProductsForOwner (never has cost).
+   ======================================================================== */
+(function () {
+let promosInitialized = false;
+let promosStale = false;
+let promoProducts = [];
+let promoCodes = [];
+let promoScope = 'order';   // 'order' | 'items'
+let promoType = 'Fixed';    // 'Fixed' | 'Percent' | 'Free'
+let promoChosen = [];       // [{ sku, label, secret, active }]
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const $ = id => document.getElementById(id);
+
+function productLabel(p) { return String(p.name || '') + (p.flavor ? ' - ' + p.flavor : ''); }
+function moneyText(n) { return '$' + Number(n).toFixed(2).replace(/\.00$/, ''); }
+function pctFromStored(v) { const n = Number(v) || 0; return n > 1 ? n : Math.round(n * 10000) / 100; }
+
+async function loadPromoProducts() {
+  const r = await apiPost({ action: 'getAllProductsForOwner', includeArchived: false, password: dashboardPassword });
+  if (Array.isArray(r)) promoProducts = r;
+}
+
+async function loadPromoCodes() {
+  const r = await apiPost({ action: 'getDiscountCodes', password: dashboardPassword });
+  if (r && r.error) {
+    $('promoList').innerHTML = '<div class="empty">Could not load codes: ' + escapeHtml(r.error) + '</div>';
+    return;
+  }
+  promoCodes = Array.isArray(r) ? r : [];
+  renderPromoList();
+}
+
+/* ---------- form state ---------- */
+function setSeg(segId, attr, value) {
+  document.querySelectorAll('#' + segId + ' button').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset[attr] === value));
+  });
+}
+
+function setScope(scope) {
+  promoScope = scope;
+  setSeg('promoScopeSeg', 'scope', scope);
+  $('promoItemsBox').hidden = scope !== 'items';
+  const freeBtn = document.querySelector('#promoTypeSeg button[data-type="Free"]');
+  freeBtn.disabled = scope !== 'items';
+  if (scope !== 'items' && promoType === 'Free') setType('Fixed');
+  if (scope === 'items') $('promoItemSearch').focus();
+  renderPreview();
+}
+
+function setType(type) {
+  promoType = type;
+  setSeg('promoTypeSeg', 'type', type);
+  $('promoValueRow').hidden = type === 'Free';
+  $('promoValueLabel').textContent = type === 'Percent' ? 'Percent off (1–100)' : 'Amount off ($)';
+  $('promoValueInput').placeholder = type === 'Percent' ? '25' : '10';
+  $('promoValueInput').step = type === 'Percent' ? '1' : '0.01';
+  renderPreview();
+}
+
+function renderItemResults() {
+  const q = $('promoItemSearch').value.trim().toLowerCase();
+  const box = $('promoItemResults');
+  if (q.length < 1) { box.innerHTML = ''; return; }
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const chosen = new Set(promoChosen.map(c => c.sku.toUpperCase()));
+  const matches = promoProducts.filter(p => {
+    if (chosen.has(String(p.sku).toUpperCase())) return false;
+    const hay = (p.sku + ' ' + p.name + ' ' + (p.flavor || '')).toLowerCase();
+    return tokens.every(t => hay.includes(t));
+  }).slice(0, 8);
+  box.innerHTML = matches.length ? matches.map((p, i) => `
+    <button type="button" class="promo-pick" data-i="${i}">
+      <span>${escapeHtml(productLabel(p))}${p.secret ? '<span class="promo-tag">Secret</span>' : ''}${p.active ? '' : '<span class="promo-tag">Inactive</span>'}</span>
+      <span class="meta">${escapeHtml(p.sku)} · ${moneyText(p.price)}</span>
+    </button>`).join('') : '<div class="empty" style="padding:9px 12px;">No matching products.</div>';
+  box.querySelectorAll('.promo-pick').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = matches[Number(btn.dataset.i)];
+      promoChosen.push({ sku: String(p.sku), label: productLabel(p), secret: !!p.secret, active: !!p.active, price: Number(p.price) });
+      $('promoItemSearch').value = '';
+      box.innerHTML = '';
+      renderChosen();
+      $('promoItemSearch').focus();
+    });
+  });
+}
+
+function renderChosen() {
+  $('promoChosen').innerHTML = promoChosen.map((c, i) => `
+    <span class="promo-chip">${escapeHtml(c.label)} <span class="promo-dim">${escapeHtml(c.sku)}</span>
+      <button type="button" data-i="${i}" aria-label="Remove ${escapeHtml(c.label)}">×</button></span>`).join('');
+  $('promoChosen').querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => { promoChosen.splice(Number(b.dataset.i), 1); renderChosen(); });
+  });
+  renderPreview();
+}
+
+/** Plain-English summary, mirroring the server's rules. */
+function describe(type, value, names, maxUses) {
+  const itemText = !names.length ? null
+    : names.length === 1 ? names[0]
+    : 'one of: ' + names.join(', ') + ' (the highest-priced one in the cart)';
+  let what;
+  if (type === 'Free') what = itemText ? (names.length === 1 ? 'One free ' + names[0] : 'One free item — ' + itemText) : 'Free item (needs products)';
+  else {
+    const amt = type === 'Percent' ? value + '% off' : moneyText(value) + ' off';
+    what = itemText ? amt + (names.length === 1 ? ' one ' + itemText : ' ' + itemText) : amt + ' the whole order';
+  }
+  const uses = maxUses === 1 ? 'Single use.' : 'Can be used ' + maxUses + ' times.';
+  return what + '. ' + uses;
+}
+
+function currentFields() {
+  return {
+    code: $('promoCodeInput').value.trim().toUpperCase(),
+    type: promoType,
+    value: promoType === 'Free' ? '' : $('promoValueInput').value.trim(),
+    appliesToSkus: promoScope === 'items' ? promoChosen.map(c => c.sku) : [],
+    maxUses: $('promoUsesInput').value.trim() === '' ? 1 : Number($('promoUsesInput').value),
+    notes: $('promoNotesInput').value.trim()
+  };
+}
+
+/** Returns an error string, or '' if the form looks valid. The server re-checks everything. */
+function formProblem(f) {
+  if (f.code && !/^[A-Z0-9][A-Z0-9_-]{2,29}$/.test(f.code)) return 'Codes are 3–30 characters: letters, numbers, dashes, or underscores.';
+  if (promoScope === 'items' && !f.appliesToSkus.length) return 'Pick at least one product.';
+  if (f.type !== 'Free') {
+    const v = Number(f.value);
+    if (f.value === '' || !isFinite(v) || v <= 0) return f.type === 'Percent' ? 'Enter a percentage from 1 to 100.' : 'Enter a dollar amount above $0.';
+    if (f.type === 'Percent' && v > 100) return 'Enter a percentage from 1 to 100.';
+  }
+  if (!Number.isInteger(f.maxUses) || f.maxUses < 1) return 'Uses must be a whole number of at least 1.';
+  return '';
+}
+
+function renderPreview() {
+  const f = currentFields();
+  const problem = formProblem(f);
+  const el = $('promoPreview');
+  if (problem) { el.textContent = ''; return; }
+  const names = promoScope === 'items' ? promoChosen.map(c => c.label) : [];
+  el.textContent = (f.code ? f.code : 'A generated code') + ': ' + describe(f.type, Number(f.value), names, f.maxUses);
+  const hidden = promoScope === 'items' && promoChosen.some(c => c.secret || !c.active);
+  if (hidden) el.textContent += ' Customers without the item in their cart get a generic message, so hidden listings stay hidden.';
+}
+
+function resetForm() {
+  $('promoCodeInput').value = '';
+  $('promoValueInput').value = '';
+  $('promoUsesInput').value = '1';
+  $('promoNotesInput').value = '';
+  $('promoItemSearch').value = '';
+  $('promoItemResults').innerHTML = '';
+  promoChosen = [];
+  renderChosen();
+  setScope('order');
+  setType('Fixed');
+}
+
+async function createCode() {
+  const errorEl = $('promoCreateError');
+  const successEl = $('promoCreateSuccess');
+  errorEl.textContent = '';
+  successEl.textContent = '';
+  const f = currentFields();
+  const problem = formProblem(f);
+  if (problem) { errorEl.textContent = problem; return; }
+  const btn = $('promoCreateBtn');
+  btn.disabled = true;
+  const r = await apiPost({ action: 'createDiscountCode', fields: f, password: dashboardPassword });
+  btn.disabled = false;
+  if (!r || r.error) { errorEl.textContent = (r && r.error) || 'Could not create the code.'; return; }
+  resetForm();
+  successEl.textContent = 'Created ' + r.code + '. ';
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'promo-ghost';
+  copy.textContent = 'Copy code';
+  copy.addEventListener('click', () => copyText(r.code, copy));
+  successEl.appendChild(copy);
+  await loadPromoCodes();
+}
+
+function copyText(text, btn) {
+  const done = () => { const old = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = old; }, 1200); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => { window.prompt('Copy this code:', text); });
+  } else {
+    window.prompt('Copy this code:', text);
+  }
+}
+
+/* ---------- list ---------- */
+function codeDescription(c) {
+  const type = String(c.type || '').toLowerCase();
+  const t = type === 'percent' ? 'Percent' : type === 'free' ? 'Free' : 'Fixed';
+  const value = t === 'Percent' ? pctFromStored(c.value) : Number(c.value) || 0;
+  return describe(t, value, c.appliesToNames || [], c.maxUses).replace(/ (Single use|Can be used \d+ times)\.$/, '');
+}
+
+function renderPromoList() {
+  const q = $('promoListSearch').value.trim().toLowerCase();
+  const activeOnly = $('promoActiveOnly').checked;
+  const showLoyalty = $('promoShowLoyalty').checked;
+  const rows = promoCodes.filter(c => {
+    if (!showLoyalty && c.autoGenerated) return false;
+    if (activeOnly && c.status !== 'active') return false;
+    if (!q) return true;
+    const hay = [c.code, c.notes, (c.appliesToNames || []).join(' '), (c.appliesToSkus || []).join(' '), c.generatedFor].join(' ').toLowerCase();
+    return q.split(/\s+/).every(t => hay.includes(t));
+  });
+  const list = $('promoList');
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty">' + (promoCodes.length ? 'No codes match these filters.' : 'No codes yet.') + '</div>';
+    return;
+  }
+  const statusText = { active: 'Active', used: 'Used up', off: 'Turned off' };
+  list.innerHTML = rows.map((c, i) => `
+    <div class="promo-item">
+      <div>
+        <span class="promo-code">${escapeHtml(c.code)}</span><span class="promo-status ${c.status}">${statusText[c.status]}</span>${c.autoGenerated ? '<span class="promo-tag">Loyalty</span>' : ''}
+        <div class="promo-desc">${escapeHtml(codeDescription(c))}</div>
+        <div class="promo-dim">${c.timesUsed} / ${c.maxUses} used${c.notes ? ' · ' + escapeHtml(c.notes) : ''}${c.autoGenerated && c.generatedFor ? ' · for ' + escapeHtml(c.generatedFor) : ''}</div>
+      </div>
+      <div class="promo-actions">
+        <button type="button" class="promo-ghost" data-act="copy" data-i="${i}">Copy</button>
+        ${c.status === 'active' ? `<button type="button" class="promo-ghost" data-act="off" data-i="${i}">Turn off</button>` : ''}
+        ${c.status === 'off' ? `<button type="button" class="promo-ghost" data-act="on" data-i="${i}">Turn on</button>` : ''}
+      </div>
+    </div>`).join('');
+  list.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const c = rows[Number(btn.dataset.i)];
+      if (btn.dataset.act === 'copy') { copyText(c.code, btn); return; }
+      const turnOn = btn.dataset.act === 'on';
+      if (!turnOn && !confirm('Turn off ' + c.code + '? Customers won\u2019t be able to use it.')) return;
+      btn.disabled = true;
+      const r = await apiPost({ action: 'setDiscountCodeActive', code: c.code, active: turnOn, password: dashboardPassword });
+      if (!r || r.error) { btn.disabled = false; alert((r && r.error) || 'Could not update the code.'); return; }
+      await loadPromoCodes();
+    });
+  });
+}
+
+/* ---------- wiring ---------- */
+$('promoGenerateBtn').addEventListener('click', () => {
+  let c = 'PROMO-';
+  const rand = new Uint32Array(6);
+  (window.crypto || window.msCrypto).getRandomValues(rand);
+  for (let i = 0; i < 6; i++) c += ALPHABET.charAt(rand[i] % ALPHABET.length);
+  $('promoCodeInput').value = c;
+  renderPreview();
+});
+document.querySelectorAll('#promoScopeSeg button').forEach(b => b.addEventListener('click', () => setScope(b.dataset.scope)));
+document.querySelectorAll('#promoTypeSeg button').forEach(b => b.addEventListener('click', () => { if (!b.disabled) setType(b.dataset.type); }));
+$('promoItemSearch').addEventListener('input', renderItemResults);
+['promoCodeInput', 'promoValueInput', 'promoUsesInput'].forEach(id => $(id).addEventListener('input', renderPreview));
+$('promoCreateBtn').addEventListener('click', createCode);
+$('promoRefreshBtn').addEventListener('click', loadPromoCodes);
+$('promoListSearch').addEventListener('input', renderPromoList);
+$('promoActiveOnly').addEventListener('change', renderPromoList);
+$('promoShowLoyalty').addEventListener('change', renderPromoList);
+
+window.KFQPromos = {
+  async show() {
+    if (!promosInitialized || promosStale) {
+      promosInitialized = true;
+      promosStale = false;
+      await Promise.all([loadPromoProducts(), loadPromoCodes()]);
+    }
+  },
+  hide() {},
+  dataChanged() {
+    if (promosInitialized) promosStale = true; // uses change when orders are confirmed
+  },
+  _describe: describe
+};
 })();
 </script>
 
