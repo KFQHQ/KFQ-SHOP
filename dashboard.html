@@ -1077,6 +1077,10 @@
 const API_BASE_URL = "https://script.google.com/macros/s/AKfycbyI11-tGxGJxri9xscd7fTE5PpPWYGz8gdiTd-dTVwatXdXGzGJIKurl_ljUyyjI-IAQg/exec";
 
 let dashboardPassword = '';
+// Error-badge state lives up here (not next to the badge code) so it exists
+// before anything can call loadErrorSummary.
+let lastUnresolvedErrorCount = 0;
+let lastErrorSummaryProblem = '';
 let allProductsCache = [];
 let loyaltyCustomersCache = [];
 let lastDashboardData = null;
@@ -2031,18 +2035,51 @@ document.getElementById('globalSearchInput').addEventListener('input', (e) => {
 /* ------------------------------------------------------------------------
    Error health badge
    ------------------------------------------------------------------------ */
-let lastUnresolvedErrorCount = 0;
 
 async function loadErrorSummary() {
-  const result = await apiPost({ action: 'getErrorSummary', password: dashboardPassword });
+  try {
+    await loadErrorSummaryUnsafe();
+  } catch (err) {
+    // Last-resort: whatever went wrong, keep the badge visible and say so.
+    const badge = document.getElementById('errorBadge');
+    badge.className = 'error-badge unresolved';
+    badge.textContent = '⚠ Couldn\u2019t check backend errors — tap to retry';
+    badge.title = String(err && err.message || err);
+    badge.onclick = () => { loadErrorSummary(); };
+  }
+}
+
+async function loadErrorSummaryUnsafe() {
   const badge = document.getElementById('errorBadge');
-  if (!result.error) lastUnresolvedErrorCount = Number(result.unresolvedCount) || 0;
-  if (result.error) {
-    badge.classList.add('hidden');
+  let result;
+  try {
+    result = await apiPost({ action: 'getErrorSummary', password: dashboardPassword });
+  } catch (err) {
+    result = { error: 'Could not reach the backend (' + (err && err.message ? err.message : 'network error') + ').' };
+  }
+  badge.classList.remove('hidden');
+  badge.onclick = openErrorListModal;
+
+  // Never hide the badge silently: if the status can't be loaded, say so
+  // (with the backend's reason) and let a tap retry.
+  if (!result || result.error) {
+    const reason = (result && result.error) || 'Unknown error.';
+    badge.className = 'error-badge unresolved';
+    const shortReason = reason.length > 80 ? reason.slice(0, 77) + '…' : reason;
+    badge.textContent = '⚠ Couldn\u2019t check backend errors (' + shortReason + ') — tap to retry';
+    badge.title = reason;
+    badge.onclick = () => {
+      badge.textContent = 'Checking…';
+      loadErrorSummary();
+      openErrorListModal();
+    };
+    lastErrorSummaryProblem = reason;
     return;
   }
 
-  badge.classList.remove('hidden');
+  lastErrorSummaryProblem = '';
+  badge.title = '';
+  lastUnresolvedErrorCount = Number(result.unresolvedCount) || 0;
   if (result.unresolvedCount === 0) {
     badge.className = 'error-badge healthy';
     badge.textContent = '✓ No backend errors';
@@ -2053,14 +2090,18 @@ async function loadErrorSummary() {
     badge.className = 'error-badge recent';
     badge.textContent = '⚠ ' + result.unresolvedCount + ' unresolved backend error' + (result.unresolvedCount === 1 ? '' : 's') + ' (none today)';
   }
-  badge.onclick = openErrorListModal;
 }
 
 async function openErrorListModal() {
-  const result = await apiPost({ action: 'getRecentErrors', password: dashboardPassword });
+  let result;
+  try {
+    result = await apiPost({ action: 'getRecentErrors', password: dashboardPassword });
+  } catch (err) {
+    result = { error: 'Could not reach the backend.' };
+  }
   const body = document.getElementById('errorListBody');
-  if (result.error) {
-    body.innerHTML = '<p class="empty">Could not load errors.</p>';
+  if (!result || result.error) {
+    body.innerHTML = '<p class="empty">Could not load errors: ' + escapeHtml((result && result.error) || 'Unknown error.') + '</p>';
   } else if (!result.length) {
     body.innerHTML = '<p class="empty">No errors logged.</p>';
   } else {
