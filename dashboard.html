@@ -1050,7 +1050,9 @@
     <h2>Backend errors</h2>
     <p class="modal-sub">Owner-only. Never shown or reachable from any customer-facing page.</p>
     <div id="errorListBody"></div>
+    <div class="error" id="errorListError"></div>
     <div class="modal-btn-row">
+      <button class="save-btn" id="resolveAllErrorsBtn" hidden>Mark all as resolved</button>
       <button class="close-modal-btn" id="closeErrorListBtn">Close</button>
     </div>
   </div>
@@ -2029,9 +2031,12 @@ document.getElementById('globalSearchInput').addEventListener('input', (e) => {
 /* ------------------------------------------------------------------------
    Error health badge
    ------------------------------------------------------------------------ */
+let lastUnresolvedErrorCount = 0;
+
 async function loadErrorSummary() {
   const result = await apiPost({ action: 'getErrorSummary', password: dashboardPassword });
   const badge = document.getElementById('errorBadge');
+  if (!result.error) lastUnresolvedErrorCount = Number(result.unresolvedCount) || 0;
   if (result.error) {
     badge.classList.add('hidden');
     return;
@@ -2076,8 +2081,32 @@ async function openErrorListModal() {
       });
     });
   }
+  // "Mark all" covers every unresolved error in the Errors tab, including
+  // any older than the 50 listed here — so it uses the badge's full count.
+  const listedUnresolved = Array.isArray(result) ? result.filter(e => !e.resolved).length : 0;
+  const total = Math.max(lastUnresolvedErrorCount, listedUnresolved);
+  const allBtn = document.getElementById('resolveAllErrorsBtn');
+  allBtn.hidden = total === 0;
+  allBtn.disabled = false;
+  allBtn.textContent = 'Mark all as resolved (' + total + ')';
+  document.getElementById('errorListError').textContent = '';
   document.getElementById('errorListModal').hidden = false;
 }
+
+document.getElementById('resolveAllErrorsBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('resolveAllErrorsBtn');
+  const n = Math.max(lastUnresolvedErrorCount, document.querySelectorAll('#errorListBody button[data-row]').length);
+  if (!confirm('Mark all ' + n + ' unresolved backend error' + (n === 1 ? '' : 's') + ' as resolved?')) return;
+  btn.disabled = true;
+  const r = await apiPost({ action: 'markAllErrorsResolved', password: dashboardPassword });
+  if (!r || r.error) {
+    btn.disabled = false;
+    document.getElementById('errorListError').textContent = (r && r.error) || 'Could not update the errors.';
+    return;
+  }
+  await loadErrorSummary();
+  openErrorListModal();
+});
 
 document.getElementById('closeErrorListBtn').addEventListener('click', () => {
   document.getElementById('errorListModal').hidden = true;
