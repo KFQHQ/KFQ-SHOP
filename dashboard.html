@@ -435,6 +435,25 @@
   }
   .tab-bar .lock-btn:hover { color: var(--text); border-color: var(--text-dim); }
   .gate-status { color: var(--text-dim); font-size: 0.85rem; margin-top: 8px; min-height: 1em; }
+  /* Fingerprint sign-in (only shown inside the Android app) */
+  .bio-unlock-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+    background: var(--accent); color: #0A2320; border: none; border-radius: 999px;
+    padding: 14px 18px; font-size: 1rem; font-weight: 700; cursor: pointer; margin: 6px 0 4px;
+  }
+  .bio-unlock-btn[hidden], .bio-or[hidden], .bio-enroll-row[hidden], .bio-disable-link[hidden] { display: none; }
+  .bio-unlock-btn svg { width: 24px; height: 24px; }
+  .bio-unlock-btn:disabled { opacity: 0.6; }
+  .bio-or { color: var(--text-dim); font-size: 0.8rem; margin: 12px 0 2px; }
+  .bio-enroll-row { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-dim); font-size: 0.85rem; margin: 2px 0 10px; }
+  .bio-enroll-row input { width: auto; margin: 0; accent-color: var(--accent); }
+  .bio-disable-link { background: none; border: none; color: var(--text-dim); text-decoration: underline; font-size: 0.78rem; margin-top: 10px; cursor: pointer; }
+  .app-toast {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface-raised); color: var(--text); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 16px; font-size: 0.88rem; z-index: 60; max-width: calc(100% - 32px); box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .app-toast[hidden] { display: none; }
   .gate-hint { color: var(--text-dim); font-size: 0.75rem; margin: 14px 0 0; }
   .tab-dot {
     display: inline-block;
@@ -738,12 +757,23 @@
   <div class="gate" id="gate">
     <h2>KFQ Shop Dashboard</h2>
     <p style="color:var(--text-dim); font-size:0.85rem;">Owner access only.</p>
+    <button type="button" class="bio-unlock-btn" id="bioUnlockBtn" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 11v3a8 8 0 0 1-1.2 4.2M8.5 20a11 11 0 0 0 1.2-6V11a2.3 2.3 0 0 1 4.6 0v1.5"/><path d="M17.3 17.8A15 15 0 0 0 17.5 14v-3a5.5 5.5 0 0 0-9.4-3.9M5 8.8A7.7 7.7 0 0 0 4.5 11v3c0 1-.1 2-.4 3"/><path d="M19.8 13.6c.1-.9.2-1.7.2-2.6a8 8 0 0 0-13-6.2"/></svg>
+      Unlock with fingerprint
+    </button>
+    <div class="bio-or" id="bioOr" hidden>or enter your password</div>
     <input type="password" id="passwordInput" placeholder="Password">
+    <label class="bio-enroll-row" id="bioEnrollRow" hidden>
+      <input type="checkbox" id="bioEnrollCheck" checked> Use fingerprint next time
+    </label>
     <div><button id="unlockBtn">Unlock</button></div>
     <div class="error" id="gateError"></div>
     <div class="gate-status" id="gateStatus"></div>
+    <button type="button" class="bio-disable-link" id="bioDisableLink" hidden>Stop using fingerprint on this phone</button>
     <p class="gate-hint">Stays unlocked for 60 minutes after your last action on this device.</p>
   </div>
+
+  <div class="app-toast" id="appToast" role="status" aria-live="polite" hidden></div>
 
   <div id="dashboardContent" hidden>
     <nav class="tab-bar" role="tablist" aria-label="Dashboard sections">
@@ -1185,6 +1215,11 @@ let dashboardPassword = '';
 // before anything can call loadErrorSummary.
 let lastUnresolvedErrorCount = 0;
 let lastErrorSummaryProblem = '';
+// Fingerprint sign-in state (Android app only) — also declared up here on purpose.
+const kfqNative = (typeof window.KFQNative === 'object' && window.KFQNative && typeof window.KFQNative.status === 'function') ? window.KFQNative : null;
+const nativeCallbacks = {};
+let nativeSeq = 0;
+let appToastTimer = null;
 let allProductsCache = [];
 let loyaltyCustomersCache = [];
 let lastDashboardData = null;
@@ -1334,10 +1369,21 @@ function lockDashboard(message, options) {
   document.getElementById('gateError').textContent = '';
   document.getElementById('gateStatus').textContent = message || '';
   document.getElementById('passwordInput').value = '';
-  document.getElementById('passwordInput').focus();
+  const bio = refreshBiometricGate();
+  if (!bio.enrolled) document.getElementById('passwordInput').focus();
 }
 
 /** On page load: reopen without the password if a session is still live. */
+/**
+ * Page load: reopen with a live session if there is one; otherwise, in the
+ * app with fingerprint sign-in set up, show the fingerprint prompt right away.
+ */
+async function resumeOwnerSessionOrFingerprint() {
+  refreshBiometricGate();
+  await resumeOwnerSession();
+  if (!dashboardPassword && biometricStatus().enrolled) fingerprintUnlock();
+}
+
 async function resumeOwnerSession() {
   const token = storageGet(OWNER_SESSION_KEY);
   if (!token) return;
@@ -1384,9 +1430,103 @@ async function unlock() {
   }
   document.getElementById('passwordInput').value = '';
   saveOwnerSession(session.sessionToken);
+  const wantsFingerprint = biometricEnrollWanted();
   const ok = await enterDashboard(session.sessionToken);
-  if (!ok) clearOwnerSession();
+  if (!ok) { clearOwnerSession(); return; }
+  if (wantsFingerprint) enrollFingerprint(pw);
 }
+
+/* ---------------- Fingerprint sign-in (Android app only) ----------------
+   window.KFQNative exists only inside the KFQ Dashboard app. The app keeps
+   the password encrypted behind the phone's fingerprint; after a successful
+   fingerprint it signs in itself and gives this page only the session code
+   (the password never comes back here). In a normal browser none of this
+   shows. */
+
+window.kfqNativeCallback = function (id, result) {
+  const cb = nativeCallbacks[id];
+  if (!cb) return;
+  delete nativeCallbacks[id];
+  cb(result || { ok: false, error: 'No response.' });
+};
+
+function nativeCall(method, args) {
+  return new Promise(resolve => {
+    const id = 'n' + (++nativeSeq);
+    nativeCallbacks[id] = resolve;
+    try {
+      kfqNative[method].apply(kfqNative, (args || []).concat([id]));
+    } catch (e) {
+      delete nativeCallbacks[id];
+      resolve({ ok: false, error: 'Fingerprint unlock is unavailable.' });
+    }
+  });
+}
+
+function biometricStatus() {
+  if (!kfqNative) return { available: false, enrolled: false };
+  try { return JSON.parse(kfqNative.status()); } catch (e) { return { available: false, enrolled: false }; }
+}
+
+function refreshBiometricGate() {
+  const st = biometricStatus();
+  document.getElementById('bioUnlockBtn').hidden = !st.enrolled;
+  document.getElementById('bioOr').hidden = !st.enrolled;
+  document.getElementById('bioDisableLink').hidden = !st.enrolled;
+  document.getElementById('bioEnrollRow').hidden = !(st.available && !st.enrolled);
+  return st;
+}
+
+function biometricEnrollWanted() {
+  const row = document.getElementById('bioEnrollRow');
+  return !!kfqNative && !row.hidden && document.getElementById('bioEnrollCheck').checked;
+}
+
+function showAppToast(message) {
+  const t = document.getElementById('appToast');
+  t.textContent = message;
+  t.hidden = false;
+  clearTimeout(appToastTimer);
+  appToastTimer = setTimeout(() => { t.hidden = true; }, 4500);
+}
+
+async function enrollFingerprint(password) {
+  const r = await nativeCall('enroll', [password]);
+  refreshBiometricGate();
+  if (r.ok) showAppToast('Fingerprint unlock is on. Next time, just touch the sensor.');
+  else if (!r.canceled && r.error) showAppToast(r.error);
+}
+
+async function fingerprintUnlock() {
+  const btn = document.getElementById('bioUnlockBtn');
+  const statusEl = document.getElementById('gateStatus');
+  document.getElementById('gateError').textContent = '';
+  btn.disabled = true;
+  const r = await nativeCall('unlock', []);
+  btn.disabled = false;
+  if (r.ok && r.token) {
+    statusEl.textContent = 'Unlocking…';
+    saveOwnerSession(r.token);
+    const ok = await enterDashboard(r.token);
+    if (!ok) {
+      clearOwnerSession();
+      statusEl.textContent = 'Sign-in failed. Enter your password.';
+    }
+    return;
+  }
+  refreshBiometricGate();
+  statusEl.textContent = r.canceled ? '' : (r.error || 'Fingerprint didn\u2019t work. Enter your password.');
+  if (r.cleared) document.getElementById('passwordInput').focus();
+}
+
+document.getElementById('bioUnlockBtn').addEventListener('click', fingerprintUnlock);
+document.getElementById('bioDisableLink').addEventListener('click', () => {
+  if (!kfqNative) return;
+  if (!confirm('Stop using your fingerprint to sign in on this phone? You\u2019ll use your password instead.')) return;
+  try { kfqNative.disable(); } catch (e) { /* ignore */ }
+  refreshBiometricGate();
+  document.getElementById('gateStatus').textContent = 'Fingerprint sign-in is off. You can turn it back on the next time you sign in with your password.';
+});
 
 /** Loads the dashboard with a session code. Returns false if it was refused. */
 async function enterDashboard(credential) {
@@ -4424,8 +4564,9 @@ window.KFQPromos = {
 </script>
 
 <script>
-// Reopen without the password if this device has a live owner session.
-resumeOwnerSession();
+// Reopen without the password if this device has a live owner session
+// (or, in the Android app, offer fingerprint sign-in).
+resumeOwnerSessionOrFingerprint();
 </script>
 </body>
 </html>
