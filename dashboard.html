@@ -579,6 +579,24 @@
     .module-wrap { max-width: 100%; }
   }
 
+  /* ---------------- Batches: auto date note, list, edit sheet ---------------- */
+  .batch-auto-date { color: var(--text-dim); font-size: 0.8rem; margin: 2px 0 6px; }
+  #tab-batches .batch-card-date { color: var(--text-dim); font-size: 0.82rem; margin-top: 3px; }
+  #tab-batches .batch-card-id { color: var(--text-dim); font-size: 0.7rem; margin-top: 2px; opacity: 0.8; }
+  #batchEditModal .modal-field select {
+    width: 100%; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; color: var(--text); font-size: 0.95rem;
+  }
+  #batchEditModal input[type="datetime-local"] { color-scheme: dark; }
+  .batch-impact { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--surface-raised); border: 1px solid var(--border); font-size: 0.85rem; }
+  .batch-impact:empty { display: none; }
+  .batch-impact ul { margin: 6px 0 0; padding-left: 18px; }
+  .batch-danger { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .batch-undo-row { display: flex; align-items: flex-start; gap: 8px; font-size: 0.82rem; color: var(--text-dim); margin-bottom: 10px; }
+  .batch-undo-row input { width: auto; margin: 2px 0 0; accent-color: var(--accent); }
+  .batch-delete-btn { width: 100%; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 999px; padding: 11px; font-weight: 700; cursor: pointer; min-height: 44px; }
+  .batch-delete-btn:disabled, #batchEditSaveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
   /* ---------------- Promo codes tab ---------------- */
   #tab-promos h1 { font-size: 1.4rem; }
   #tab-promos .promo-sub { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 16px; }
@@ -1036,8 +1054,7 @@
     <div class="section">
       <h2 style="font-size:1.05rem;">New Batch</h2>
 
-      <label for="strainNameInput">Strain Name</label>
-      <input type="text" id="strainNameInput" placeholder="e.g. Blue Razz">
+      <p class="batch-auto-date">The batch is named after its product. The date and time are logged automatically.</p>
 
       <label for="productSkuSelect">Product this batch produces</label>
       <select id="productSkuSelect"><option value="">Select a product...</option></select>
@@ -1069,6 +1086,7 @@
 
     <div class="section">
       <h2 style="font-size:1.05rem;">Recent Batches</h2>
+      <p class="batch-auto-date">Tap a batch to edit or delete it.</p>
       <div id="batchList"></div>
       <button class="secondary" id="refreshBatchesBtn" style="margin-top:10px;">Refresh</button>
     </div>
@@ -1188,6 +1206,59 @@
     <div class="modal-btn-row">
       <button class="save-btn" id="resolveAllErrorsBtn" hidden>Mark all as resolved</button>
       <button class="close-modal-btn" id="closeErrorListBtn">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="batchEditModal" hidden>
+  <div class="modal-panel">
+    <h2>Edit batch</h2>
+    <p class="modal-sub" id="batchEditSub"></p>
+
+    <div class="modal-field">
+      <label for="batchEditProduct">Product this batch produces</label>
+      <select id="batchEditProduct"></select>
+    </div>
+    <div class="modal-field">
+      <label for="batchEditDate">Date</label>
+      <input type="datetime-local" id="batchEditDate" step="60">
+    </div>
+    <div class="modal-field">
+      <label for="batchEditYield">Total amount yielded (units)</label>
+      <input type="number" id="batchEditYield" min="1" step="1">
+    </div>
+    <div class="modal-field">
+      <label for="batchEditFormula">Formula used</label>
+      <textarea id="batchEditFormula" rows="2"></textarea>
+    </div>
+    <div class="modal-field">
+      <label for="batchEditHeat">Heat-plate time</label>
+      <input type="text" id="batchEditHeat">
+    </div>
+    <div class="modal-field">
+      <label>Materials used (from back-stock)</label>
+      <div id="batchEditMaterials"></div>
+      <div class="add-item-row">
+        <select id="batchEditAddMaterial"><option value="">Add a material...</option></select>
+        <input type="number" id="batchEditAddQty" min="1" value="1" step="any">
+        <button type="button" id="batchEditAddBtn">Add</button>
+      </div>
+    </div>
+    <div class="modal-field">
+      <label for="batchEditNotes">Notes</label>
+      <input type="text" id="batchEditNotes">
+    </div>
+
+    <div class="batch-impact" id="batchEditImpact" aria-live="polite"></div>
+    <div class="error" id="batchEditError"></div>
+    <div class="modal-btn-row">
+      <button class="save-btn" id="batchEditSaveBtn">Save changes</button>
+      <button class="close-modal-btn" id="batchEditCloseBtn">Close</button>
+    </div>
+
+    <div class="batch-danger">
+      <label class="batch-undo-row"><input type="checkbox" id="batchDeleteUndo" checked> Also undo its stock changes (take the yield back out, return the materials)</label>
+      <button type="button" class="batch-delete-btn" id="batchDeleteBtn">Delete batch</button>
     </div>
   </div>
 </div>
@@ -4026,7 +4097,7 @@ async function loadProductOptions() {
   if (products.error) return;
   allProductsCache = products;
   document.getElementById('productSkuSelect').innerHTML = '<option value="">Select a product...</option>' +
-    products.map(p => `<option value="${p.sku}">${escapeHtml(p.name)}${p.flavor ? ' - ' + escapeHtml(p.flavor) : ''}</option>`).join('');
+    products.map(p => `<option value="${escapeHtml(p.sku)}">${escapeHtml(p.name)}${p.flavor ? ' - ' + escapeHtml(p.flavor) : ''}</option>`).join('');
 }
 
 async function loadMaterialOptions() {
@@ -4034,7 +4105,7 @@ async function loadMaterialOptions() {
   if (items.error) return;
   allInternalItemsCache = items;
   document.getElementById('addMaterialSelect').innerHTML = '<option value="">Add a material...</option>' +
-    items.map(i => `<option value="${i.sku}">${escapeHtml(i.name)} (${i.quantity} on hand)</option>`).join('');
+    items.map(i => `<option value="${escapeHtml(i.sku)}">${escapeHtml(i.name)} (${i.quantity} on hand)</option>`).join('');
 }
 
 /* ---------------- Materials picker ---------------- */
@@ -4086,14 +4157,12 @@ document.getElementById('createBatchBtn').addEventListener('click', async () => 
   successEl.textContent = '';
 
   const adminName = OWNER_ADMIN_NAME;
-  const strainName = document.getElementById('strainNameInput').value.trim();
   const productSku = document.getElementById('productSkuSelect').value;
   const formulaUsed = document.getElementById('formulaInput').value.trim();
   const heatPlateTime = document.getElementById('heatPlateInput').value.trim();
   const totalYielded = document.getElementById('totalYieldedInput').value;
   const notes = document.getElementById('batchNotesInput').value.trim();
 
-  if (!strainName) { errorEl.textContent = 'Strain name is required.'; return; }
   if (!productSku) { errorEl.textContent = 'Select which product this batch produces.'; return; }
   if (!totalYielded || Number(totalYielded) <= 0) { errorEl.textContent = 'Enter a valid total amount yielded.'; return; }
 
@@ -4103,7 +4172,6 @@ document.getElementById('createBatchBtn').addEventListener('click', async () => 
   const result = await apiPost({
     action: 'createBatch',
     fields: {
-      strainName: strainName,
       productSku: productSku,
       formulaUsed: formulaUsed,
       heatPlateTime: heatPlateTime,
@@ -4122,8 +4190,8 @@ document.getElementById('createBatchBtn').addEventListener('click', async () => 
     return;
   }
 
-  successEl.textContent = 'Batch created: ' + result.batchId;
-  document.getElementById('strainNameInput').value = '';
+  const made = allProductsCache.find(p => String(p.sku) === String(productSku));
+  successEl.textContent = 'Batch created: ' + (made ? made.name + (made.flavor ? ' - ' + made.flavor : '') : productSku) + ' · ' + formatBatchDate(nowBatchDate());
   document.getElementById('productSkuSelect').value = '';
   document.getElementById('formulaInput').value = '';
   document.getElementById('heatPlateInput').value = '';
@@ -4151,44 +4219,240 @@ async function loadBatchList() {
     return;
   }
   container.innerHTML = result.map((b, i) => `
-    <div class="batch-card" data-index="${i}">
-      <div class="batch-card-top"><span>${escapeHtml(b.strainName)}</span><span>${b.totalYielded} units</span></div>
-      <div class="batch-card-meta">${b.batchId} · ${b.creationDate} · ${escapeHtml(b.productSku)}</div>
-      <div class="batch-detail hidden" id="batchDetail-${i}"></div>
+    <div class="batch-card" data-index="${i}" role="button" tabindex="0">
+      <div class="batch-card-top"><span>${escapeHtml(b.name || b.productSku)}</span><span>${escapeHtml(b.totalYielded)} units</span></div>
+      <div class="batch-card-date">${escapeHtml(formatBatchDate(b.creationDate))}</div>
+      <div class="batch-card-id">${escapeHtml(b.batchId)}${b.productExists === false ? ' · product ' + escapeHtml(b.productSku) + ' no longer exists' : ''}</div>
     </div>
   `).join('');
 
   container.querySelectorAll('.batch-card').forEach(card => {
-    card.addEventListener('click', () => toggleBatchDetail(Number(card.dataset.index)));
+    const open = () => openBatchEditor(batchListCache[Number(card.dataset.index)].batchId);
+    card.addEventListener('click', open);
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
   });
 }
 
-async function toggleBatchDetail(index) {
-  const detailEl = document.getElementById('batchDetail-' + index);
-  if (!detailEl.classList.contains('hidden')) {
-    detailEl.classList.add('hidden');
+/* ---------------- Dates ---------------- */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function parseBatchDate(text) {
+  const m = String(text || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  return m ? { y: +m[1], mo: +m[2], d: +m[3], h: m[4] ? +m[4] : 0, mi: m[5] ? +m[5] : 0, hasTime: !!m[4] } : null;
+}
+/** "2026-09-27 14:30:00" -> "Sep 27, 2026 · 2:30 PM" */
+function formatBatchDate(text) {
+  const p = parseBatchDate(text);
+  if (!p) return String(text || '');
+  const date = MONTHS[p.mo - 1] + ' ' + p.d + ', ' + p.y;
+  if (!p.hasTime) return date;
+  const h12 = ((p.h + 11) % 12) + 1;
+  return date + ' · ' + h12 + ':' + String(p.mi).padStart(2, '0') + ' ' + (p.h < 12 ? 'AM' : 'PM');
+}
+function toDateTimeLocal(text) {
+  const p = parseBatchDate(text);
+  if (!p) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return p.y + '-' + pad(p.mo) + '-' + pad(p.d) + 'T' + pad(p.h) + ':' + pad(p.mi);
+}
+function nowBatchDate() {
+  const n = new Date(), pad = v => String(v).padStart(2, '0');
+  return n.getFullYear() + '-' + pad(n.getMonth() + 1) + '-' + pad(n.getDate()) + ' ' + pad(n.getHours()) + ':' + pad(n.getMinutes()) + ':00';
+}
+
+/* ---------------- Edit / delete a batch ---------------- */
+let editingBatch = null;      // the batch as loaded from the server
+let editMaterials = [];       // [{ sku, name, quantity }]
+
+function productLabelFor(sku) {
+  const p = allProductsCache.find(x => String(x.sku).toUpperCase() === String(sku).toUpperCase());
+  return p ? p.name + (p.flavor ? ' - ' + p.flavor : '') : sku;
+}
+function materialNameFor(sku, fallback) {
+  const m = allInternalItemsCache.find(x => String(x.sku).toUpperCase() === String(sku).toUpperCase());
+  return m ? m.name : (fallback || sku);
+}
+
+async function openBatchEditor(batchId) {
+  const modal = document.getElementById('batchEditModal');
+  document.getElementById('batchEditError').textContent = '';
+  document.getElementById('batchEditImpact').textContent = '';
+  document.getElementById('batchEditSub').textContent = 'Loading…';
+  modal.hidden = false;
+  if (!allProductsCache.length) await loadProductOptions();
+  if (!allInternalItemsCache.length) await loadMaterialOptions();
+
+  const b = await apiPost({ action: 'getBatchDetail', batchId: batchId, password: dashboardPassword });
+  if (!b || b.error) {
+    document.getElementById('batchEditSub').textContent = '';
+    document.getElementById('batchEditError').textContent = (b && b.error) || 'Could not load this batch.';
     return;
   }
+  editingBatch = b;
+  editMaterials = (b.materials || []).map(m => ({ sku: String(m.sku), name: materialNameFor(m.sku, m.name), quantity: Number(m.quantity) }));
 
-  const batch = batchListCache[index];
-  const result = await apiPost({ action: 'getBatchDetail', batchId: batch.batchId, password: dashboardPassword });
-  if (result.error) {
-    detailEl.innerHTML = '<div class="error">' + result.error + '</div>';
-    detailEl.classList.remove('hidden');
-    return;
+  document.getElementById('batchEditSub').textContent = b.batchId + (b.savedName && b.savedName !== b.name ? ' · originally logged as “' + b.savedName + '”' : '');
+  const productSelect = document.getElementById('batchEditProduct');
+  const known = allProductsCache.some(p => String(p.sku).toUpperCase() === String(b.productSku).toUpperCase());
+  productSelect.innerHTML = (known ? '' : `<option value="${escapeHtml(b.productSku)}">${escapeHtml(b.productSku)} (no longer exists — pick another)</option>`) +
+    allProductsCache.map(p => `<option value="${escapeHtml(p.sku)}">${escapeHtml(p.name)}${p.flavor ? ' - ' + escapeHtml(p.flavor) : ''}</option>`).join('');
+  productSelect.value = known ? allProductsCache.find(p => String(p.sku).toUpperCase() === String(b.productSku).toUpperCase()).sku : b.productSku;
+  document.getElementById('batchEditDate').value = toDateTimeLocal(b.creationDate);
+  document.getElementById('batchEditYield').value = b.totalYielded;
+  document.getElementById('batchEditFormula').value = b.formulaUsed || '';
+  document.getElementById('batchEditHeat').value = b.heatPlateTime || '';
+  document.getElementById('batchEditNotes').value = b.notes || '';
+  document.getElementById('batchDeleteUndo').checked = true;
+  document.getElementById('batchEditAddMaterial').innerHTML = '<option value="">Add a material...</option>' +
+    allInternalItemsCache.map(i => `<option value="${escapeHtml(i.sku)}">${escapeHtml(i.name)} (${escapeHtml(i.quantity)} on hand)</option>`).join('');
+  document.getElementById('batchEditAddQty').value = '1';
+  renderEditMaterials();
+}
+
+function renderEditMaterials() {
+  const list = document.getElementById('batchEditMaterials');
+  if (!editMaterials.length) {
+    list.innerHTML = '<p class="empty">No materials recorded.</p>';
+  } else {
+    list.innerHTML = editMaterials.map((m, i) => `
+      <div class="edit-item-row">
+        <span class="item-name">${escapeHtml(m.name)}</span>
+        <input type="number" min="0" step="any" value="${escapeHtml(m.quantity)}" data-i="${i}" aria-label="Quantity of ${escapeHtml(m.name)}">
+        <button type="button" class="remove-item-btn" data-i="${i}" aria-label="Remove ${escapeHtml(m.name)}">&times;</button>
+      </div>`).join('');
+    list.querySelectorAll('input[data-i]').forEach(inp => inp.addEventListener('input', () => {
+      editMaterials[Number(inp.dataset.i)].quantity = Number(inp.value);
+      renderBatchImpact();
+    }));
+    list.querySelectorAll('button[data-i]').forEach(btn => btn.addEventListener('click', () => {
+      editMaterials.splice(Number(btn.dataset.i), 1);
+      renderEditMaterials();
+    }));
   }
+  renderBatchImpact();
+}
 
-  detailEl.innerHTML = `
-    <div class="row"><span class="label">Formula</span><span>${escapeHtml(result.formulaUsed || '—')}</span></div>
-    <div class="row"><span class="label">Heat-plate time</span><span>${escapeHtml(result.heatPlateTime || '—')}</span></div>
-    <div class="row"><span class="label">Admin</span><span>${escapeHtml(result.admin)}</span></div>
-    <div class="row"><span class="label">Notes</span><span>${escapeHtml(result.notes || '—')}</span></div>
-    <div style="margin-top:8px; color:var(--text-dim);">Materials used:</div>
-    ${result.materials.length
-      ? result.materials.map(m => `<div class="row"><span class="label">${escapeHtml(m.name)}</span><span>${m.quantity}</span></div>`).join('')
-      : '<div class="empty">None recorded.</div>'}
-  `;
-  detailEl.classList.remove('hidden');
+document.getElementById('batchEditAddBtn').addEventListener('click', () => {
+  const sel = document.getElementById('batchEditAddMaterial');
+  const sku = sel.value;
+  const qty = Number(document.getElementById('batchEditAddQty').value);
+  if (!sku || !(qty > 0)) return;
+  const existing = editMaterials.find(m => m.sku.toUpperCase() === sku.toUpperCase());
+  if (existing) existing.quantity = (Number(existing.quantity) || 0) + qty;
+  else editMaterials.push({ sku: sku, name: materialNameFor(sku), quantity: qty });
+  sel.value = '';
+  document.getElementById('batchEditAddQty').value = '1';
+  renderEditMaterials();
+});
+['batchEditProduct', 'batchEditYield'].forEach(id =>
+  document.getElementById(id).addEventListener(id === 'batchEditProduct' ? 'change' : 'input', renderBatchImpact));
+
+function sumBySku(list) {
+  const t = {};
+  list.forEach(m => { const k = String(m.sku).toUpperCase(); t[k] = (t[k] || 0) + (Number(m.quantity) || 0); });
+  return t;
+}
+function fmtQty(n) { return Number.isInteger(n) ? String(n) : String(Math.round(n * 1000) / 1000); }
+
+/** Plain-English list of the stock corrections Save would make (mirrors the server). */
+function batchStockImpact() {
+  if (!editingBatch) return [];
+  const lines = [];
+  const oldSku = String(editingBatch.productSku), newSku = document.getElementById('batchEditProduct').value;
+  const oldYield = Number(editingBatch.totalYielded) || 0, newYield = Number(document.getElementById('batchEditYield').value) || 0;
+  if (oldSku.toUpperCase() === String(newSku).toUpperCase()) {
+    const d = newYield - oldYield;
+    if (d > 0) lines.push('Add ' + fmtQty(d) + ' to ' + productLabelFor(newSku) + ' stock');
+    if (d < 0) lines.push('Take ' + fmtQty(-d) + ' off ' + productLabelFor(newSku) + ' stock');
+  } else {
+    lines.push('Take ' + fmtQty(oldYield) + ' off ' + productLabelFor(oldSku) + ' stock');
+    lines.push('Add ' + fmtQty(newYield) + ' to ' + productLabelFor(newSku) + ' stock');
+  }
+  const before = sumBySku((editingBatch.materials || [])), after = sumBySku(editMaterials.filter(m => Number(m.quantity) > 0));
+  Object.keys(Object.assign({}, before, after)).forEach(k => {
+    const d = (after[k] || 0) - (before[k] || 0);
+    if (d > 0) lines.push('Use ' + fmtQty(d) + ' more ' + materialNameFor(k) + ' from Internal supplies');
+    if (d < 0) lines.push('Return ' + fmtQty(-d) + ' ' + materialNameFor(k) + ' to Internal supplies');
+  });
+  return lines;
+}
+
+function renderBatchImpact() {
+  const el = document.getElementById('batchEditImpact');
+  const lines = batchStockImpact();
+  el.innerHTML = lines.length
+    ? '<strong>Saving will also:</strong><ul>' + lines.map(l => '<li>' + escapeHtml(l) + '</li>').join('') + '</ul>'
+    : '';
+}
+
+function closeBatchEditor() {
+  document.getElementById('batchEditModal').hidden = true;
+  editingBatch = null;
+  editMaterials = [];
+}
+document.getElementById('batchEditCloseBtn').addEventListener('click', closeBatchEditor);
+
+document.getElementById('batchEditSaveBtn').addEventListener('click', async () => {
+  if (!editingBatch) return;
+  const errorEl = document.getElementById('batchEditError');
+  errorEl.textContent = '';
+  const yieldVal = Number(document.getElementById('batchEditYield').value);
+  if (!(yieldVal > 0)) { errorEl.textContent = 'Enter a valid total amount yielded.'; return; }
+  const dateVal = document.getElementById('batchEditDate').value;
+  if (!dateVal) { errorEl.textContent = 'Enter the batch date.'; return; }
+  const materials = editMaterials.filter(m => Number(m.quantity) > 0).map(m => ({ sku: m.sku, quantity: Number(m.quantity) }));
+  const lines = batchStockImpact();
+  if (lines.length && !confirm('Save changes to this batch?\n\nThis will also:\n• ' + lines.join('\n• '))) return;
+
+  const btn = document.getElementById('batchEditSaveBtn');
+  btn.disabled = true;
+  const r = await apiPost({
+    action: 'updateBatch',
+    batchId: editingBatch.batchId,
+    fields: {
+      productSku: document.getElementById('batchEditProduct').value,
+      creationDate: dateVal,
+      totalYielded: yieldVal,
+      formulaUsed: document.getElementById('batchEditFormula').value.trim(),
+      heatPlateTime: document.getElementById('batchEditHeat').value.trim(),
+      notes: document.getElementById('batchEditNotes').value.trim(),
+      materials: materials
+    },
+    admin: OWNER_ADMIN_NAME,
+    password: dashboardPassword
+  });
+  btn.disabled = false;
+  if (!r || r.error) { errorEl.textContent = (r && r.error) || 'Could not save the batch.'; return; }
+  closeBatchEditor();
+  await loadMaterialOptions();
+  await loadBatchList();
+  showBatchNote('Batch saved.');
+});
+
+document.getElementById('batchDeleteBtn').addEventListener('click', async () => {
+  if (!editingBatch) return;
+  const undo = document.getElementById('batchDeleteUndo').checked;
+  const name = editingBatch.name || editingBatch.productSku;
+  const msg = 'Delete this batch (' + name + ', ' + formatBatchDate(editingBatch.creationDate) + ')?\n\n' + (undo
+    ? 'Its ' + editingBatch.totalYielded + ' units will be taken back out of ' + name + ' stock, and its materials returned to Internal supplies.'
+    : 'Only the record is removed. Stock is NOT changed.') + '\n\nThis can\u2019t be undone.';
+  if (!confirm(msg)) return;
+  const errorEl = document.getElementById('batchEditError');
+  errorEl.textContent = '';
+  const btn = document.getElementById('batchDeleteBtn');
+  btn.disabled = true;
+  const r = await apiPost({ action: 'deleteBatch', batchId: editingBatch.batchId, undoStock: undo, admin: OWNER_ADMIN_NAME, password: dashboardPassword });
+  btn.disabled = false;
+  if (!r || r.error) { errorEl.textContent = (r && r.error) || 'Could not delete the batch.'; return; }
+  closeBatchEditor();
+  await loadMaterialOptions();
+  await loadBatchList();
+  showBatchNote(undo ? 'Batch deleted and its stock changes undone.' : 'Batch record deleted. Stock was not changed.');
+});
+
+function showBatchNote(text) {
+  const el = document.getElementById('createBatchSuccess');
+  el.textContent = text;
+  setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 5000);
 }
 
 /* ---------------- Public surface for the dashboard ---------------- */
